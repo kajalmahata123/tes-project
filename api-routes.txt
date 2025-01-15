@@ -1,0 +1,51 @@
+from fastapi import APIRouter, HTTPException
+from app.models.schemas import CheckoutAnalysisResponse, TransactionInfo
+from app.utils.sample_data import get_sample_data
+
+router = APIRouter()
+
+@router.get("/checkout-analysis", response_model=CheckoutAnalysisResponse)
+async def get_checkout_analysis():
+    """
+    Get checkout analysis data including available cards and their benefits
+    """
+    try:
+        data = get_sample_data()
+        return CheckoutAnalysisResponse(**data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/analyze-transaction")
+async def analyze_transaction(transaction: TransactionInfo):
+    """
+    Analyze a specific transaction and return recommended cards
+    """
+    try:
+        data = get_sample_data()
+        return CheckoutAnalysisResponse(**data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/cards/{card_id}/set-default")
+async def set_default_card(card_id: str):
+    """
+    Set a card as the default payment method
+    """
+    try:
+        return {"message": f"Card {card_id} set as default"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/cards/{card_id}/benefits")
+async def get_card_benefits(card_id: str):
+    """
+    Get detailed benefits for a specific card
+    """
+    try:
+        data = get_sample_data()
+        card = next((card for card in data["cards"] if card["id"] == card_id), None)
+        if not card:
+            raise HTTPException(status_code=404, detail="Card not found")
+        return card["benefits"]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

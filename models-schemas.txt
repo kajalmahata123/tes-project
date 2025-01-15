@@ -1,0 +1,57 @@
+from pydantic import BaseModel, Field
+from typing import List, Optional
+from datetime import datetime
+from decimal import Decimal
+
+class MerchantInfo(BaseModel):
+    name: str
+    category: str
+    special_offers: Optional[List[str]] = []
+    merchant_type: str
+
+class TransactionInfo(BaseModel):
+    merchant: MerchantInfo
+    amount: Decimal = Field(..., decimal_places=2)
+    date: datetime
+    eligible_for_installments: bool = True
+    currency: str = "USD"
+
+class InstallmentPlan(BaseModel):
+    months: int
+    interest: float
+    processing_fee: float
+    min_amount: Decimal
+    monthly_amount: Decimal
+    total_amount: Decimal
+
+class ProtectionCoverage(BaseModel):
+    duration: str
+    coverage: str
+
+class Protection(BaseModel):
+    extended_warranty: ProtectionCoverage
+    purchase_protection: ProtectionCoverage
+
+class SpecialOffer(BaseModel):
+    type: str
+    description: str
+    validity: str
+
+class CardBenefits(BaseModel):
+    cashback: Optional[float] = None
+    points: Optional[int] = None
+    installments: List[InstallmentPlan]
+    protection: Protection
+    special_offers: List[SpecialOffer]
+
+class Card(BaseModel):
+    id: str
+    type: str
+    network: str
+    last4: str
+    is_default: bool = Field(..., alias="isDefault")
+    benefits: CardBenefits
+
+class CheckoutAnalysisResponse(BaseModel):
+    transaction: TransactionInfo
+    cards: List[Card]
