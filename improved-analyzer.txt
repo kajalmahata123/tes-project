@@ -1,0 +1,314 @@
+from anthropic import Anthropic
+import json
+import logging
+from typing import Dict, List
+from datetime import datetime
+
+class CardAnalyzerService:
+    def __init__(self, api_key: str):
+        self.client = Anthropic(api_key=api_key)
+        self.model = "claude-3-sonnet-20240229"
+        self.logger = self._setup_logger()
+
+    def _setup_logger(self) -> logging.Logger:
+        logger = logging.getLogger(__name__)
+        if not logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+            logger.setLevel(logging.INFO)
+        return logger
+
+    async def analyze_checkout_options(self, transaction: Dict, available_cards: List[Dict]) -> Dict:
+        """Analyze each card's benefits individually for the current transaction"""
+        prompt = f"""
+        You are a credit card benefits analysis expert. For each card, analyze the potential benefits for this transaction:
+
+        TRANSACTION DETAILS:
+        {json.dumps(transaction, indent=2)}
+
+        AVAILABLE CARDS:
+        {json.dumps(available_cards, indent=2)}
+
+        For each card, analyze:
+
+        1. Transaction Context:
+           - Merchant category qualification
+           - Transaction amount thresholds
+           - Applicable special offers
+           - Seasonal promotions
+
+        2. Individual Card Analysis:
+           a) Rewards Value:
+              - Base rewards rate application
+              - Category multiplier eligibility
+              - Special offer qualification
+              - Exact rewards calculation
+
+           b) Protection Benefits:
+              - Warranty coverage applicability
+              - Purchase protection terms
+              - Coverage limits
+              - Value calculation
+
+           c) Payment Options:
+              - Available installment plans
+              - Interest calculations
+              - Fee structure
+              - Payment scheduling
+
+           d) Card-Specific Features:
+              - Special offer eligibility
+              - Benefit activation status
+              - Usage requirements
+              - Timing considerations
+
+        Return the analysis in exactly this JSON structure:
+        {
+            "transaction_context": {
+                "merchant_category_insights": [
+                    "Detailed category qualification information",
+                    "Specific bonus category details"
+                ],
+                "amount_based_factors": [
+                    "Transaction amount threshold analysis",
+                    "Minimum spend requirement checks"
+                ],
+                "timing_considerations": [
+                    "Current promotions analysis",
+                    "Offer expiration details"
+                ]
+            },
+            "card_analysis": {
+                "card_id": {
+                    "immediate_benefits": {
+                        "rewards_value": "Exact dollar value",
+                        "protection_value": "Coverage amount",
+                        "special_offers": [
+                            "Detailed offer descriptions"
+                        ],
+                        "total_value": "Benefit sum"
+                    },
+                    "payment_options": {
+                        "installment_plans": [
+                            {
+                                "months": "number",
+                                "monthly_payment": "amount",
+                                "total_cost": "amount",
+                                "effective_apr": "percentage"
+                            }
+                        ],
+                        "total_cost_scenarios": [
+                            "Cost breakdown per option"
+                        ],
+                        "optimal_payment_strategy": "Payment recommendation"
+                    },
+                    "category_advantages": {
+                        "multipliers": [
+                            "Category multiplier details"
+                        ],
+                        "special_perks": [
+                            "Perk descriptions and values"
+                        ],
+                        "stacking_opportunities": [
+                            "Compatible benefit combinations"
+                        ]
+                    }
+                }
+            },
+            "timing_insights": [
+                "Time-sensitive benefit details",
+                "Activation deadlines"
+            ],
+            "merchant_specific_factors": [
+                "Merchant-specific benefits",
+                "Partnership advantages"
+            ]
+        }
+
+        IMPORTANT CALCULATION RULES:
+        1. Show monetary values in exact dollars and cents
+        2. Calculate rewards to 4 decimal places before rounding
+        3. Include calculation basis for each value
+        4. Show percentage values to 2 decimal places
+        5. Focus on immediate benefit availability
+        6. Include probability factors for protections
+        """
+        return await self._get_claude_response(prompt)
+
+    async def analyze_benefits_value(self, transaction: Dict, card: Dict) -> Dict:
+        """Calculate specific benefit values for a single card"""
+        prompt = f"""
+        You are a credit card benefits valuation expert. Calculate the exact value of all benefits for this specific card and transaction:
+
+        TRANSACTION:
+        {json.dumps(transaction, indent=2)}
+
+        CARD:
+        {json.dumps(card, indent=2)}
+
+        Analyze the following:
+
+        1. Rewards Value:
+           - Base rewards calculation
+           - Category multiplier evaluation
+           - Special offer qualification
+           - Welcome bonus eligibility
+           - Portal benefits
+           - Additional earning opportunities
+
+        2. Protection Benefits:
+           - Extended warranty coverage
+           - Purchase protection terms
+           - Price protection availability
+           - Return protection details
+           - Additional protections
+           - Coverage limitations
+
+        3. Special Offers:
+           - Statement credits
+           - Merchant offers
+           - Bank portal offers
+           - Category bonuses
+           - Limited-time promotions
+           - Activation requirements
+
+        4. Value Analysis:
+           - Direct benefits
+           - Near-term benefits
+           - Extended benefits
+           - Usage requirements
+           - Time restrictions
+
+        Return the analysis in this JSON structure:
+        {
+            "rewards_calculation": {
+                "base_rewards": "Exact value with calculation",
+                "category_bonus": "Additional category value",
+                "special_multipliers": "Promotion values",
+                "total_rewards": "Complete rewards sum"
+            },
+            "protection_value": {
+                "warranty_value": "Coverage value",
+                "purchase_protection": "Protection value",
+                "price_protection": "Price guarantee value",
+                "total_protection": "Protection sum"
+            },
+            "special_offers": {
+                "immediate_savings": "Direct discounts",
+                "future_value": "Upcoming benefit value",
+                "stacking_benefits": "Combined offer value"
+            },
+            "total_value_analysis": {
+                "immediate_value": "Current benefits",
+                "potential_value": "Maximum benefit value",
+                "cost_savings": "Net value calculation"
+            }
+        }
+
+        IMPORTANT VALUATION RULES:
+        1. Calculate exact monetary values
+        2. Include protection probability factors
+        3. Show calculation methods
+        4. Consider benefit timing
+        5. Note activation requirements
+        6. Document usage conditions
+        """
+        return await self._get_claude_response(prompt)
+
+    async def analyze_payment_scenarios(self, transaction: Dict, card: Dict) -> Dict:
+        """Analyze payment options for a single card"""
+        prompt = f"""
+        You are a credit card payment analysis expert. Evaluate all payment options for:
+
+        TRANSACTION:
+        {json.dumps(transaction, indent=2)}
+
+        CARD:
+        {json.dumps(card, indent=2)}
+
+        Analyze:
+
+        1. Single Payment:
+           - Total cost
+           - Fee inclusion
+           - Reward earnings
+           - Net cost calculation
+           - Cash flow effect
+
+        2. Installment Plans:
+           For each plan:
+           - Monthly payments
+           - Interest total
+           - APR calculation
+           - Reward implications
+           - Fee assessment
+           - Credit usage impact
+
+        3. Payment Factors:
+           - Cash flow management
+           - Fee considerations
+           - Credit implications
+           - Timeline factors
+           - Reward timing
+           - Payment requirements
+
+        Return the analysis in this JSON structure:
+        {
+            "single_payment": {
+                "total_cost": "Full payment amount",
+                "rewards_earned": "Reward value",
+                "net_cost": "Final cost calculation",
+                "cash_flow_impact": "Financial effect"
+            },
+            "installment_options": [
+                {
+                    "months": "Term length",
+                    "monthly_payment": "Monthly amount",
+                    "total_cost": "Full cost",
+                    "total_interest": "Interest amount",
+                    "effective_apr": "True APR",
+                    "rewards_impact": "Reward effect",
+                    "credit_impact": "Usage impact"
+                }
+            ],
+            "payment_considerations": {
+                "immediate_payment": {
+                    "benefits": "Single payment advantages",
+                    "considerations": "Important factors"
+                },
+                "installment_payment": {
+                    "benefits": "Installment advantages",
+                    "considerations": "Key factors"
+                }
+            }
+        }
+
+        IMPORTANT ANALYSIS RULES:
+        1. Use exact cent calculations
+        2. Include all applicable fees
+        3. Show APR to 2 decimals
+        4. Note reward timing details
+        5. Include credit implications
+        6. Note payment requirements
+        """
+        return await self._get_claude_response(prompt)
+
+    async def _get_claude_response(self, prompt: str) -> Dict:
+        """Get and parse Claude's response with error handling"""
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=2048,
+                messages=[{
+                    "role": "user",
+                    "content": prompt
+                }]
+            )
+            return json.loads(response.content)
+        except Exception as e:
+            self.logger.error(f"Claude analysis error: {str(e)}")
+            return {"error": "Analysis failed", "details": str(e)}
