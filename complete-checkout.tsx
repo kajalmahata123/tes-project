@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { 
   CreditCard,
   Gift,
@@ -129,8 +127,8 @@ const CheckoutCardSelection = () => {
   return (
     <div className="max-w-3xl mx-auto p-4 bg-gray-50 min-h-screen">
       {/* Transaction Summary */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
+      <div className="bg-white rounded-lg shadow-sm mb-6">
+        <div className="p-6">
           <div className="flex justify-between items-start">
             <div>
               <h3 className="text-lg font-semibold">{SAMPLE_DATA.transaction.merchant.name}</h3>
@@ -147,207 +145,206 @@ const CheckoutCardSelection = () => {
               </span>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Main Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid grid-cols-3 gap-4 mb-6">
-          <TabsTrigger value="cards" className="flex items-center">
-            <CreditCard className="w-4 h-4 mr-2" />
-            Cards
-          </TabsTrigger>
-          <TabsTrigger value="installments" className="flex items-center">
-            <Calendar className="w-4 h-4 mr-2" />
-            Installments
-          </TabsTrigger>
-          <TabsTrigger value="benefits" className="flex items-center">
-            <Gift className="w-4 h-4 mr-2" />
-            Benefits
-          </TabsTrigger>
-        </TabsList>
+      {/* Tab Navigation */}
+      <div className="flex space-x-4 border-b border-gray-200 mb-6">
+        {[
+          { id: 'cards', icon: CreditCard, label: 'Cards' },
+          { id: 'installments', icon: Calendar, label: 'Installments' },
+          { id: 'benefits', icon: Gift, label: 'Benefits' }
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`flex items-center px-4 py-2 border-b-2 transition-colors ${
+              activeTab === tab.id
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <tab.icon className="w-4 h-4 mr-2" />
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-        {/* Cards Tab */}
-        <TabsContent value="cards">
-          <div className="space-y-4">
-            {SAMPLE_DATA.cards.map((card) => (
-              <Card 
-                key={card.id}
-                className={`cursor-pointer transition-all ${
-                  selectedCard === card.id ? 'ring-2 ring-blue-500' : 'hover:bg-gray-50'
-                }`}
-                onClick={() => setSelectedCard(card.id)}
-              >
-                <CardContent className="p-4">
-                  {/* Card Header */}
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center">
-                      <CreditCard className={`w-5 h-5 ${
-                        selectedCard === card.id ? 'text-blue-500' : 'text-gray-400'
-                      }`} />
-                      <div className="ml-3">
-                        <p className="font-medium">{card.type}</p>
-                        <p className="text-sm text-gray-600">
-                          {card.network} •••• {card.last4}
-                          {card.isDefault && 
-                            <span className="ml-2 text-blue-600">(Default)</span>
+      {/* Cards Tab Content */}
+      {activeTab === 'cards' && (
+        <div className="space-y-4">
+          {SAMPLE_DATA.cards.map((card) => (
+            <div 
+              key={card.id}
+              onClick={() => setSelectedCard(card.id)}
+              className={`bg-white rounded-lg shadow-sm cursor-pointer transition-all ${
+                selectedCard === card.id ? 'ring-2 ring-blue-500' : 'hover:bg-gray-50'
+              }`}
+            >
+              <div className="p-4">
+                {/* Card Header */}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center">
+                    <CreditCard className={`w-5 h-5 ${
+                      selectedCard === card.id ? 'text-blue-500' : 'text-gray-400'
+                    }`} />
+                    <div className="ml-3">
+                      <p className="font-medium">{card.type}</p>
+                      <p className="text-sm text-gray-600">
+                        {card.network} •••• {card.last4}
+                        {card.isDefault && 
+                          <span className="ml-2 text-blue-600">(Default)</span>
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {card.benefits.cashback && (
+                      <p className="text-green-600 font-medium">
+                        {card.benefits.cashback * 100}% cashback
+                      </p>
+                    )}
+                    {card.benefits.points && (
+                      <p className="text-blue-600 font-medium">
+                        {card.benefits.points}x points
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Expanded Details */}
+                {selectedCard === card.id && (
+                  <div className="mt-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center text-sm font-medium text-gray-600">
+                          <DollarSign className="w-4 h-4 mr-1 text-green-500" />
+                          Rewards Value
+                        </div>
+                        <p className="mt-1 text-lg font-semibold">
+                          {card.benefits.cashback 
+                            ? formatCurrency(SAMPLE_DATA.transaction.amount * card.benefits.cashback)
+                            : `${Math.floor(SAMPLE_DATA.transaction.amount * card.benefits.points)} points`
                           }
                         </p>
                       </div>
-                    </div>
-                    <div className="text-right">
-                      {card.benefits.cashback && (
-                        <p className="text-green-600 font-medium">
-                          {card.benefits.cashback * 100}% cashback
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center text-sm font-medium text-gray-600">
+                          <Shield className="w-4 h-4 mr-1 text-blue-500" />
+                          Protection
+                        </div>
+                        <p className="mt-1 text-sm">
+                          {card.benefits.protection.extended_warranty.duration} warranty
                         </p>
-                      )}
-                      {card.benefits.points && (
-                        <p className="text-blue-600 font-medium">
-                          {card.benefits.points}x points
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Expanded Card Details */}
-                  {selectedCard === card.id && (
-                    <div className="mt-4 space-y-4">
-                      {/* Quick Benefits */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center text-sm font-medium text-gray-600">
-                            <DollarSign className="w-4 h-4 mr-1 text-green-500" />
-                            Rewards Value
-                          </div>
-                          <p className="mt-1 text-lg font-semibold">
-                            {card.benefits.cashback 
-                              ? formatCurrency(SAMPLE_DATA.transaction.amount * card.benefits.cashback)
-                              : `${Math.floor(SAMPLE_DATA.transaction.amount * card.benefits.points)} points`
-                            }
-                          </p>
-                        </div>
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center text-sm font-medium text-gray-600">
-                            <Shield className="w-4 h-4 mr-1 text-blue-500" />
-                            Protection
-                          </div>
-                          <p className="mt-1 text-sm">
-                            {card.benefits.protection.extended_warranty.duration} warranty
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Special Offers */}
-                      {card.benefits.special_offers.length > 0 && (
-                        <div className="p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center mb-2">
-                            <Tag className="w-4 h-4 mr-2 text-purple-500" />
-                            <p className="font-medium">Special Offers</p>
-                          </div>
-                          {card.benefits.special_offers.map((offer, index) => (
-                            <div key={index} className="ml-6 text-sm">
-                              <p className="font-medium">{offer.description}</p>
-                              <p className="text-gray-600">Valid: {offer.validity}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* Installments Tab */}
-        <TabsContent value="installments">
-          <div className="space-y-4">
-            {SAMPLE_DATA.cards.map((card) => (
-              <Card key={card.id}>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center">
-                    <CreditCard className="w-5 h-5 mr-2" />
-                    {card.type}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {card.benefits.installments.map((plan) => (
-                      <div key={plan.months} className="p-4 bg-gray-50 rounded-lg">
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="font-medium">{plan.months} Monthly Payments</span>
-                          <span className="text-lg font-bold text-blue-600">
-                            {formatCurrency(plan.monthlyAmount)}/mo
-                          </span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
-                          <div>Interest: {(plan.interest * 100).toFixed(2)}%</div>
-                          <div>Fee: {formatCurrency(plan.processingFee)}</div>
-                          <div>Total: {formatCurrency(plan.totalAmount)}</div>
-                          <div>Min Purchase: {formatCurrency(plan.minAmount)}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* Benefits Tab */}
-        <TabsContent value="benefits">
-          <div className="space-y-4">
-            {SAMPLE_DATA.cards.map((card) => (
-              <Card key={card.id}>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center">
-                    <Star className="w-5 h-5 mr-2" />
-                    {card.type} Benefits
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Protection Benefits */}
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <h4 className="font-medium mb-3 flex items-center">
-                        <Shield className="w-4 h-4 mr-2 text-blue-500" />
-                        Protection Benefits
-                      </h4>
-                      <div className="space-y-3 ml-6">
-                        {Object.entries(card.benefits.protection).map(([key, value]) => (
-                          <div key={key} className="text-sm">
-                            <p className="font-medium capitalize">{key.replace('_', ' ')}</p>
-                            <p className="text-gray-600">Duration: {value.duration}</p>
-                            <p className="text-gray-600">Coverage: {value.coverage}</p>
-                          </div>
-                        ))}
                       </div>
                     </div>
 
                     {/* Special Offers */}
-                    <div className="p-4 bg-gray-50 rounded-lg">
-                      <h4 className="font-medium mb-3 flex items-center">
-                        <Gift className="w-4 h-4 mr-2 text-purple-500" />
-                        Special Offers
-                      </h4>
-                      <div className="space-y-3 ml-6">
+                    {card.benefits.special_offers.length > 0 && (
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center mb-2">
+                          <Tag className="w-4 h-4 mr-2 text-purple-500" />
+                          <p className="font-medium">Special Offers</p>
+                        </div>
                         {card.benefits.special_offers.map((offer, index) => (
-                          <div key={index} className="text-sm">
+                          <div key={index} className="ml-6 text-sm">
                             <p className="font-medium">{offer.description}</p>
                             <p className="text-gray-600">Valid: {offer.validity}</p>
                           </div>
                         ))}
                       </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Installments Tab Content */}
+      {activeTab === 'installments' && (
+        <div className="space-y-4">
+          {SAMPLE_DATA.cards.map((card) => (
+            <div key={card.id} className="bg-white rounded-lg shadow-sm">
+              <div className="p-6">
+                <div className="flex items-center mb-4">
+                  <CreditCard className="w-5 h-5 mr-2" />
+                  <h3 className="text-lg font-semibold">{card.type}</h3>
+                </div>
+                <div className="space-y-4">
+                  {card.benefits.installments.map((plan) => (
+                    <div key={plan.months} className="p-4 bg-gray-50 rounded-lg">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium">{plan.months} Monthly Payments</span>
+                        <span className="text-lg font-bold text-blue-600">
+                          {formatCurrency(plan.monthlyAmount)}/mo
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                        <div>Interest: {(plan.interest * 100).toFixed(2)}%</div>
+                        <div>Fee: {formatCurrency(plan.processingFee)}</div>
+                        <div>Total: {formatCurrency(plan.totalAmount)}</div>
+                        <div>Min Purchase: {formatCurrency(plan.minAmount)}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Benefits Tab Content */}
+      {activeTab === 'benefits' && (
+        <div className="space-y-4">
+          {SAMPLE_DATA.cards.map((card) => (
+            <div key={card.id} className="bg-white rounded-lg shadow-sm">
+              <div className="p-6">
+                <div className="flex items-center mb-4">
+                  <Star className="w-5 h-5 mr-2" />
+                  <h3 className="text-lg font-semibold">{card.type} Benefits</h3>
+                </div>
+                <div className="space-y-4">
+                  {/* Protection Benefits */}
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <h4 className="font-medium mb-3 flex items-center">
+                      <Shield className="w-4 h-4 mr-2 text-blue-500" />
+                      Protection Benefits
+                    </h4>
+                    <div className="space-y-3 ml-6">
+                      {Object.entries(card.benefits.protection).map(([key, value]) => (
+                        <div key={key} className="text-sm">
+                          <p className="font-medium capitalize">{key.replace('_', ' ')}</p>
+                          <p className="text-gray-600">Duration: {value.duration}</p>
+                          <p className="text-gray-600">Coverage: {value.coverage}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-      </Tabs>
+
+                  {/* Special Offers */}
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <h4 className="font-medium mb-3 flex items-center">
+                      <Gift className="w-4 h-4 mr-2 text-purple-500" />
+                      Special Offers
+                    </h4>
+                    <div className="space-y-3 ml-6">
+                      {card.benefits.special_offers.map((offer, index) => (
+                        <div key={index} className="text-sm">
+                          <p className="font-medium">{offer.description}</p>
+                          <p className="text-gray-600">Valid: {offer.validity}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
