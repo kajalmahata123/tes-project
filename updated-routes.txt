@@ -1,0 +1,151 @@
+from fastapi import APIRouter, HTTPException, Depends
+from typing import List, Dict
+from app.models.schemas import (
+    CheckoutAnalysisResponse,
+    TransactionInfo,
+    Card,
+    CardBenefits
+)
+from app.utils.sample_data import get_sample_data
+from app.services.analyzer import CardAnalyzerService
+from app.config import get_settings
+
+router = APIRouter()
+
+# Dependency to get analyzer service
+async def get_analyzer() -> CardAnalyzerService:
+    settings = get_settings()
+    return CardAnalyzerService(api_key=settings.ANTHROPIC_API_KEY)
+
+@router.get("/checkout-analysis", response_model=CheckoutAnalysisResponse)
+async def get_checkout_analysis(analyzer: CardAnalyzerService = Depends(get_analyzer)):
+    """
+    Get checkout analysis data including available cards and their benefits
+    """
+    try:
+        # Get sample data
+        data = get_sample_data()
+        
+        # Get analysis from Claude
+        analysis = await analyzer.analyze_checkout_options(
+            transaction=data["transaction"],
+            available_cards=data["cards"]
+        )
+        
+        # Combine sample data with analysis
+        response_data = {
+            "transaction": data["transaction"],
+            "cards": data["cards"],
+            "analysis": analysis
+        }
+        
+        return CheckoutAnalysisResponse(**response_data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/analyze-transaction")
+async def analyze_transaction(
+    transaction: TransactionInfo,
+    analyzer: CardAnalyzerService = Depends(get_analyzer)
+):
+    """
+    Analyze a specific transaction and return recommended cards
+    """
+    try:
+        # Get available cards (in real app, would come from user's profile)
+        data = get_sample_data()
+        available_cards = data["cards"]
+        
+        # Get analysis from Claude
+        analysis = await analyzer.analyze_checkout_options(
+            transaction=transaction.dict(),
+            available_cards=available_cards
+        )
+        
+        return {
+            "transaction": transaction,
+            "available_cards": available_cards,
+            "analysis": analysis
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/cards/{card_id}/analysis")
+async def get_card_analysis(
+    card_id: str,
+    analyzer: CardAnalyzerService = Depends(get_analyzer)
+):
+    """
+    Get detailed analysis for a specific card
+    """
+    try:
+        # Get card data
+        data = get_sample_data()
+        card = next((card for card in data["cards"] if card["id"] == card_id), None)
+        if not card:
+            raise HTTPException(status_code=404, detail="Card not found")
+            
+        # Get transaction data (in real app, might be current cart or recent transaction)
+        transaction = data["transaction"]
+        
+        # Get comprehensive analysis
+        benefits_analysis = await analyzer.analyze_benefits_value(
+            transaction=transaction,
+            card=card
+        )
+        
+        payment_analysis = await analyzer.analyze_payment_scenarios(
+            transaction=transaction,
+            card=card
+        )
+        
+        return {
+            "card": card,
+            "benefits_analysis": benefits_analysis,
+            "payment_analysis": payment_analysis
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/cards/{card_id}/set-default")
+async def set_default_card(card_id: str):
+    """
+    Set a card as the default payment method
+    """
+    try:
+        # In real app, would update user's profile in database
+        return {"message": f"Card {card_id} set as default"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/cards/{card_id}/benefits", response_model=CardBenefits)
+async def get_card_benefits(
+    card_id: str,
+    analyzer: CardAnalyzerService = Depends(get_analyzer)
+):
+    """
+    Get detailed benefits for a specific card
+    """
+    try:
+        data = get_sample_data()
+        card = next((card for card in data["cards"] if card["id"] == card_id), None)
+        if not card:
+            raise HTTPException(status_code=404, detail="Card not found")
+            
+        transaction = data["transaction"]
+        
+        # Get detailed benefits analysis
+        benefits_analysis = await analyzer.analyze_benefits_value(
+            transaction=transaction,
+            card=card
+        )
+        
+        # Combine actual benefits data with analysis
+        response = {
+            **card["benefits"],
+            "analysis": benefits_analysis
+        }
+        
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
