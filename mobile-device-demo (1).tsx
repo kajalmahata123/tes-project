@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { 
   CreditCard, Gift, Shield, Clock, DollarSign, Calendar,
   ChevronRight, Tag, X, Battery, Signal, Wifi, Check
@@ -199,13 +197,12 @@ function MobileDeviceDemo() {
           <p className="text-gray-500 text-sm mb-8">
             Transaction ID: {Math.random().toString(36).substr(2, 9).toUpperCase()}
           </p>
-          <Button 
-            className="w-full" 
-            size="lg"
+          <button 
+            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
             onClick={handleBackToMain}
           >
             Back to Home
-          </Button>
+          </button>
         </div>
       );
     }
@@ -215,14 +212,12 @@ function MobileDeviceDemo() {
         <div className="h-[calc(100vh-10rem)] overflow-y-auto bg-white">
           <div className="border-b sticky top-0 bg-white z-10">
             <div className="flex items-center p-4">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="mr-2"
+              <button 
+                className="p-2 hover:bg-gray-100 rounded-lg mr-2"
                 onClick={handleBackToMain}
               >
                 <X className="w-4 h-4" />
-              </Button>
+              </button>
               <h2 className="font-semibold">{activeCard?.type} Details</h2>
             </div>
           </div>
@@ -236,8 +231,8 @@ function MobileDeviceDemo() {
     return (
       <div className="relative h-[calc(100vh-10rem)]">
         <div className="h-full overflow-y-auto">
-          <Card className="rounded-none border-x-0">
-            <CardContent className="pt-6">
+          <div className="border-b">
+            <div className="pt-6 px-4">
               <div className="flex justify-between items-start">
                 <div>
                   <h3 className="text-lg font-semibold">{SAMPLE_DATA.transaction.merchant.name}</h3>
@@ -252,50 +247,87 @@ function MobileDeviceDemo() {
                   </span>
                 )}
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </div>
+
+          {/* Quick Benefits Preview */}
+          {selectedCard && (
+            <div className="px-4 py-3 bg-gray-50">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-gray-600">Selected Card Benefits</h3>
+                <button 
+                  className="text-blue-600 text-sm hover:underline"
+                  onClick={() => handleCardClick(SAMPLE_DATA.cards.find(c => c.id === selectedCard))}
+                >
+                  View Details
+                </button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-white p-3 rounded-lg">
+                  <div className="flex items-center mb-1">
+                    <DollarSign className="w-4 h-4 text-green-500 mr-1" />
+                    <span className="text-sm">You'll Earn</span>
+                  </div>
+                  <p className="font-bold text-green-600">
+                    {selectedCard && SAMPLE_DATA.cards.find(c => c.id === selectedCard)?.benefits.cashback 
+                      ? formatCurrency(SAMPLE_DATA.transaction.amount * SAMPLE_DATA.cards.find(c => c.id === selectedCard)?.benefits.cashback)
+                      : `${Math.floor(SAMPLE_DATA.transaction.amount * (SAMPLE_DATA.cards.find(c => c.id === selectedCard)?.benefits.points || 0))} points`
+                    }
+                  </p>
+                </div>
+
+                <div className="bg-white p-3 rounded-lg">
+                  <div className="flex items-center mb-1">
+                    <Calendar className="w-4 h-4 text-orange-500 mr-1" />
+                    <span className="text-sm">Split Pay</span>
+                  </div>
+                  <p className="font-bold">
+                    {SAMPLE_DATA.cards.find(c => c.id === selectedCard)?.benefits.installments[0].months} months
+                    <span className="text-sm font-normal text-gray-600 ml-1">available</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="px-4 mt-6 pb-24">
             <h2 className="text-lg font-semibold mb-4">Select Payment Method</h2>
             <div className="space-y-3">
               {SAMPLE_DATA.cards.map((card) => (
-                <Card 
+                <div 
                   key={card.id}
-                  className={`cursor-pointer transition-all ${
+                  className={`p-4 border rounded-lg cursor-pointer transition-all ${
                     selectedCard === card.id ? 'ring-2 ring-blue-500' : ''
                   }`}
                   onClick={() => handleCardClick(card)}
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <CreditCard className={`w-5 h-5 ${
-                          selectedCard === card.id ? 'text-blue-500' : 'text-gray-400'
-                        }`} />
-                        <div className="ml-3">
-                          <p className="font-medium">{card.type}</p>
-                          <p className="text-sm text-gray-600">
-                            {card.network} •••• {card.last4}
-                          </p>
-                        </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <CreditCard className={`w-5 h-5 ${
+                        selectedCard === card.id ? 'text-blue-500' : 'text-gray-400'
+                      }`} />
+                      <div className="ml-3">
+                        <p className="font-medium">{card.type}</p>
+                        <p className="text-sm text-gray-600">
+                          {card.network} •••• {card.last4}
+                        </p>
                       </div>
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
                     </div>
-                  </CardContent>
-                </Card>
+                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                  </div>
+                </div>
               ))}
             </div>
           </div>
         </div>
 
         <div className="absolute bottom-0 inset-x-0 p-4 bg-white border-t">
-          <Button 
-            className="w-full bg-blue-600 hover:bg-blue-700" 
-            size="lg"
+          <button 
+            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
             onClick={handlePaymentClick}
           >
             Pay {formatCurrency(SAMPLE_DATA.transaction.amount)}
-          </Button>
+          </button>
         </div>
       </div>
     );
