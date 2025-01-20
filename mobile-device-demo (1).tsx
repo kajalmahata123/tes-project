@@ -1,10 +1,70 @@
 import React, { useState } from 'react';
 import { 
-  CreditCard, Gift, Shield, Clock, DollarSign, Calendar,
-  ChevronRight, Tag, X, Battery, Signal, Wifi, Check
+  CreditCard, Shield, DollarSign, Calendar,
+  ChevronRight, Tag, X, Battery, Signal, Wifi, Check, Trash2
 } from 'lucide-react';
 
-const SAMPLE_DATA = {
+// Type definitions
+type InstallmentPlan = {
+  months: number;
+  interest: number;
+  processingFee: number;
+  minAmount: number;
+  monthlyAmount: number;
+  totalAmount: number;
+};
+
+type SpecialOffer = {
+  type: string;
+  description: string;
+  validity: string;
+};
+
+type CardBenefits = {
+  cashback: number | null;
+  points: number | null;
+  installments: InstallmentPlan[];
+  protection: {
+    extended_warranty: {
+      duration: string;
+      coverage: string;
+    };
+  };
+  special_offers: SpecialOffer[];
+};
+
+type Card = {
+  id: string;
+  type: string;
+  network: string;
+  last4: string;
+  isDefault: boolean;
+  benefits: CardBenefits;
+};
+
+type MerchantData = {
+  name: string;
+  category: string;
+  special_offers: string[];
+  merchant_type: string;
+};
+
+type TransactionData = {
+  merchant: MerchantData;
+  amount: number;
+  date: string;
+  eligible_for_installments: boolean;
+};
+
+type SampleDataType = {
+  transaction: TransactionData;
+  cards: Card[];
+};
+
+type ViewType = 'main' | 'details' | 'success';
+
+// Initial data
+const initialSampleData: SampleDataType = {
   transaction: {
     merchant: {
       name: "Apple Store",
@@ -33,14 +93,6 @@ const SAMPLE_DATA = {
             processingFee: 0,
             minAmount: 500,
             monthlyAmount: 433.33,
-            totalAmount: 1299.99
-          },
-          { 
-            months: 6, 
-            interest: 0,
-            processingFee: 0,
-            minAmount: 1000,
-            monthlyAmount: 216.67,
             totalAmount: 1299.99
           }
         ],
@@ -96,58 +148,90 @@ const SAMPLE_DATA = {
   ]
 };
 
-function MobileDeviceDemo() {
-  const [selectedCard, setSelectedCard] = useState(SAMPLE_DATA.cards.find(card => card.isDefault)?.id);
-  const [currentView, setCurrentView] = useState('main');
-  const [activeCard, setActiveCard] = useState(null);
+// Main component
+const MobileDeviceDemo: React.FC = () => {
+  // State management
+  const [sampleData, setSampleData] = useState<SampleDataType>(initialSampleData);
+  const [selectedCard, setSelectedCard] = useState<string | undefined>(
+    initialSampleData.cards.find(card => card.isDefault)?.id
+  );
+  const [currentView, setCurrentView] = useState<ViewType>('main');
+  const [activeCard, setActiveCard] = useState<Card | null>(null);
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
+  // Helper functions
+  const formatCurrency = (amount: number): string => (
+    new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
-    }).format(amount);
-  };
+    }).format(amount)
+  );
 
-  const handleCardClick = (card) => {
+  // Event handlers
+  const handleCardClick = (card: Card): void => {
     setSelectedCard(card.id);
     setActiveCard(card);
     setCurrentView('details');
   };
 
-  const handlePaymentClick = () => {
+  const handlePaymentClick = (): void => {
     setCurrentView('success');
   };
 
-  const handleBackToMain = () => {
+  const handleBackToMain = (): void => {
     setCurrentView('main');
   };
 
-  const renderCardDetails = (card) => {
-    return (
-      <div className="space-y-4 px-1">
-        <div className="space-y-3">
-          <div className="p-3 bg-gray-50 rounded-lg">
+  const handleRemoveCard = (cardId: string): void => {
+    const updatedCards = sampleData.cards.filter(card => card.id !== cardId);
+    setSampleData({
+      ...sampleData,
+      cards: updatedCards
+    });
+    
+    if (selectedCard === cardId) {
+      const defaultCard = updatedCards.find(card => card.isDefault);
+      setSelectedCard(defaultCard?.id);
+      setActiveCard(null);
+      setCurrentView('main');
+    }
+  };
+
+  // Render functions
+  const renderCardDetails = (card: Card): JSX.Element => (
+    <div className="space-y-4 px-1">
+      <div className="space-y-3">
+        <div className="p-3 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between">
             <div className="flex items-center text-sm font-medium text-gray-600">
               <DollarSign className="w-4 h-4 mr-1 text-green-500" />
               Rewards Value
             </div>
-            <p className="mt-1 text-lg font-semibold">
-              {card.benefits.cashback 
-                ? formatCurrency(SAMPLE_DATA.transaction.amount * card.benefits.cashback)
-                : `${Math.floor(SAMPLE_DATA.transaction.amount * card.benefits.points)} points`
-              }
-            </p>
+            <button
+              className="p-2 hover:bg-red-50 rounded-lg text-red-500"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRemoveCard(card.id);
+              }}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
-          
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center text-sm font-medium text-gray-600">
-              <Shield className="w-4 h-4 mr-1 text-blue-500" />
-              Protection
-            </div>
-            <p className="mt-1 text-sm">
-              {card.benefits.protection.extended_warranty.duration} warranty
-            </p>
+          <p className="mt-1 text-lg font-semibold">
+            {card.benefits.cashback 
+              ? formatCurrency(sampleData.transaction.amount * card.benefits.cashback)
+              : `${Math.floor(sampleData.transaction.amount * (card.benefits.points || 0))} points`
+            }
+          </p>
+        </div>
+
+        <div className="p-3 bg-gray-50 rounded-lg">
+          <div className="flex items-center text-sm font-medium text-gray-600">
+            <Shield className="w-4 h-4 mr-1 text-blue-500" />
+            Protection
           </div>
+          <p className="mt-1 text-sm">
+            {card.benefits.protection.extended_warranty.duration} warranty
+          </p>
         </div>
 
         <div className="p-3 bg-gray-50 rounded-lg">
@@ -180,120 +264,82 @@ function MobileDeviceDemo() {
           </div>
         )}
       </div>
-    );
-  };
+    </div>
+  );
 
-  function renderContent() {
-    if (currentView === 'success') {
-      return (
-        <div className="h-[calc(100vh-10rem)] flex flex-col items-center justify-center px-4 bg-white">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
-            <Check className="w-8 h-8 text-green-600" />
+  const renderMainContent = (): JSX.Element => (
+    <div className="relative h-[calc(100vh-10rem)]">
+      <div className="h-full overflow-y-auto">
+        <div className="border-b">
+          <div className="pt-6 px-4">
+            <div className="flex justify-between items-start">
+              <div>
+                <h3 className="text-lg font-semibold">{sampleData.transaction.merchant.name}</h3>
+                <p className="text-sm text-gray-600">{sampleData.transaction.merchant.category}</p>
+                <div className="mt-2 text-2xl font-bold">
+                  {formatCurrency(sampleData.transaction.amount)}
+                </div>
+              </div>
+              {sampleData.transaction.merchant.special_offers?.length > 0 && (
+                <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                  Offers
+                </span>
+              )}
+            </div>
           </div>
-          <h2 className="text-2xl font-bold mb-2">Payment Successful!</h2>
-          <p className="text-gray-600 mb-2">
-            Your payment of {formatCurrency(SAMPLE_DATA.transaction.amount)} has been processed.
-          </p>
-          <p className="text-gray-500 text-sm mb-8">
-            Transaction ID: {Math.random().toString(36).substr(2, 9).toUpperCase()}
-          </p>
-          <button 
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
-            onClick={handleBackToMain}
-          >
-            Back to Home
-          </button>
         </div>
-      );
-    }
 
-    if (currentView === 'details') {
-      return (
-        <div className="h-[calc(100vh-10rem)] overflow-y-auto bg-white">
-          <div className="border-b sticky top-0 bg-white z-10">
-            <div className="flex items-center p-4">
+        {selectedCard && (
+          <div className="px-4 py-3 bg-gray-50">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">Selected Card Benefits</h3>
               <button 
-                className="p-2 hover:bg-gray-100 rounded-lg mr-2"
-                onClick={handleBackToMain}
+                className="text-blue-600 text-sm hover:underline"
+                onClick={() => {
+                  const card = sampleData.cards.find(c => c.id === selectedCard);
+                  if (card) handleCardClick(card);
+                }}
               >
-                <X className="w-4 h-4" />
+                View Details
               </button>
-              <h2 className="font-semibold">{activeCard?.type} Details</h2>
             </div>
-          </div>
-          <div className="p-4 pb-20">
-            {activeCard && renderCardDetails(activeCard)}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="relative h-[calc(100vh-10rem)]">
-        <div className="h-full overflow-y-auto">
-          <div className="border-b">
-            <div className="pt-6 px-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-semibold">{SAMPLE_DATA.transaction.merchant.name}</h3>
-                  <p className="text-sm text-gray-600">{SAMPLE_DATA.transaction.merchant.category}</p>
-                  <div className="mt-2 text-2xl font-bold">
-                    {formatCurrency(SAMPLE_DATA.transaction.amount)}
-                  </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-white p-3 rounded-lg">
+                <div className="flex items-center mb-1">
+                  <DollarSign className="w-4 h-4 text-green-500 mr-1" />
+                  <span className="text-sm">You'll Earn</span>
                 </div>
-                {SAMPLE_DATA.transaction.merchant.special_offers?.length > 0 && (
-                  <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                    Offers
-                  </span>
-                )}
+                <p className="font-bold text-green-600">
+                  {selectedCard && sampleData.cards.find(c => c.id === selectedCard)?.benefits.cashback 
+                    ? formatCurrency(sampleData.transaction.amount * (sampleData.cards.find(c => c.id === selectedCard)?.benefits.cashback || 0))
+                    : `${Math.floor(sampleData.transaction.amount * (sampleData.cards.find(c => c.id === selectedCard)?.benefits.points || 0))} points`
+                  }
+                </p>
+              </div>
+
+              <div className="bg-white p-3 rounded-lg">
+                <div className="flex items-center mb-1">
+                  <Calendar className="w-4 h-4 text-orange-500 mr-1" />
+                  <span className="text-sm">Split Pay</span>
+                </div>
+                <p className="font-bold">
+                  {sampleData.cards.find(c => c.id === selectedCard)?.benefits.installments[0].months} months
+                  <span className="text-sm font-normal text-gray-600 ml-1">available</span>
+                </p>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Quick Benefits Preview */}
-          {selectedCard && (
-            <div className="px-4 py-3 bg-gray-50">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-gray-600">Selected Card Benefits</h3>
-                <button 
-                  className="text-blue-600 text-sm hover:underline"
-                  onClick={() => handleCardClick(SAMPLE_DATA.cards.find(c => c.id === selectedCard))}
-                >
-                  View Details
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-white p-3 rounded-lg">
-                  <div className="flex items-center mb-1">
-                    <DollarSign className="w-4 h-4 text-green-500 mr-1" />
-                    <span className="text-sm">You'll Earn</span>
-                  </div>
-                  <p className="font-bold text-green-600">
-                    {selectedCard && SAMPLE_DATA.cards.find(c => c.id === selectedCard)?.benefits.cashback 
-                      ? formatCurrency(SAMPLE_DATA.transaction.amount * SAMPLE_DATA.cards.find(c => c.id === selectedCard)?.benefits.cashback)
-                      : `${Math.floor(SAMPLE_DATA.transaction.amount * (SAMPLE_DATA.cards.find(c => c.id === selectedCard)?.benefits.points || 0))} points`
-                    }
-                  </p>
-                </div>
-
-                <div className="bg-white p-3 rounded-lg">
-                  <div className="flex items-center mb-1">
-                    <Calendar className="w-4 h-4 text-orange-500 mr-1" />
-                    <span className="text-sm">Split Pay</span>
-                  </div>
-                  <p className="font-bold">
-                    {SAMPLE_DATA.cards.find(c => c.id === selectedCard)?.benefits.installments[0].months} months
-                    <span className="text-sm font-normal text-gray-600 ml-1">available</span>
-                  </p>
-                </div>
-              </div>
+        <div className="px-4 mt-6 pb-24">
+          <h2 className="text-lg font-semibold mb-4">Select Payment Method</h2>
+          {sampleData.cards.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No cards available. Please add a card to continue.
             </div>
-          )}
-
-          <div className="px-4 mt-6 pb-24">
-            <h2 className="text-lg font-semibold mb-4">Select Payment Method</h2>
+          ) : (
             <div className="space-y-3">
-              {SAMPLE_DATA.cards.map((card) => (
+              {sampleData.cards.map((card) => (
                 <div 
                   key={card.id}
                   className={`p-4 border rounded-lg cursor-pointer transition-all ${
@@ -313,25 +359,85 @@ function MobileDeviceDemo() {
                         </p>
                       </div>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                    <div className="flex items-center">
+                      <button
+                        className="p-2 hover:bg-red-50 rounded-lg text-red-500 mr-2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveCard(card.id);
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-
-        <div className="absolute bottom-0 inset-x-0 p-4 bg-white border-t">
-          <button 
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
-            onClick={handlePaymentClick}
-          >
-            Pay {formatCurrency(SAMPLE_DATA.transaction.amount)}
-          </button>
+          )}
         </div>
       </div>
-    );
-  }
+
+      <div className="absolute bottom-0 inset-x-0 p-4 bg-white border-t">
+        <button 
+          className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+          onClick={handlePaymentClick}
+          disabled={sampleData.cards.length === 0}
+        >
+          Pay {formatCurrency(sampleData.transaction.amount)}
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderSuccessContent = (): JSX.Element => (
+    <div className="h-[calc(100vh-10rem)] flex flex-col items-center justify-center px-4 bg-white">
+      <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
+        <Check className="w-8 h-8 text-green-600" />
+      </div>
+      <h2 className="text-2xl font-bold mb-2">Payment Successful!</h2>
+      <p className="text-gray-600 mb-2">
+        Your payment of {formatCurrency(sampleData.transaction.amount)} has been processed.
+      </p>
+      <p className="text-gray-500 text-sm mb-8">
+        Transaction ID: {Math.random().toString(36).substr(2, 9).toUpperCase()}
+      </p>
+      <button 
+        className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+        onClick={handleBackToMain}
+      >
+        Back to Home
+      </button>
+    </div>
+  );
+
+  const renderContent = (): JSX.Element => {
+    if (currentView === 'success') {
+      return renderSuccessContent();
+    }
+    if (currentView === 'details' && activeCard) {
+      return (
+        <div className="h-[calc(100vh-10rem)] overflow-y-auto bg-white">
+          <div className="border-b sticky top-0 bg-white z-10">
+            <div className="flex items-center p-4">
+              <button 
+                className="p-2 hover:bg-gray-100 rounded-lg mr-2"
+                onClick={handleBackToMain}
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <h2 className="font-semibold">{activeCard.type} Details</h2>
+            </div>
+          </div>
+          <div className="p-4 pb-20">
+            {renderCardDetails(activeCard)}
+          </div>
+        </div>
+      );
+    }
+    return renderMainContent();
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -365,6 +471,6 @@ function MobileDeviceDemo() {
       </div>
     </div>
   );
-}
+};
 
 export default MobileDeviceDemo;
