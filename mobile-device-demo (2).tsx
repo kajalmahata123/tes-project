@@ -1,8 +1,47 @@
 import React, { useState } from 'react';
 import { 
-  CreditCard, Gift, Shield, Clock, DollarSign, Calendar,
+  CreditCard, Shield, DollarSign, Calendar,
   ChevronRight, Tag, X, Battery, Signal, Wifi, Check
 } from 'lucide-react';
+
+type ViewType = 'main' | 'details' | 'success';
+
+interface InstallmentPlan {
+  months: number;
+  interest: number;
+  processingFee: number;
+  minAmount: number;
+  monthlyAmount: number;
+  totalAmount: number;
+}
+
+interface SpecialOffer {
+  type: string;
+  description: string;
+  validity: string;
+}
+
+interface CardBenefits {
+  cashback: number | null;
+  points: number | null;
+  installments: InstallmentPlan[];
+  protection: {
+    extended_warranty: {
+      duration: string;
+      coverage: string;
+    };
+  };
+  special_offers: SpecialOffer[];
+}
+
+interface Card {
+  id: string;
+  type: string;
+  network: string;
+  last4: string;
+  isDefault: boolean;
+  benefits: CardBenefits;
+}
 
 const SAMPLE_DATA = {
   transaction: {
@@ -34,14 +73,6 @@ const SAMPLE_DATA = {
             minAmount: 500,
             monthlyAmount: 433.33,
             totalAmount: 1299.99
-          },
-          { 
-            months: 6, 
-            interest: 0,
-            processingFee: 0,
-            minAmount: 1000,
-            monthlyAmount: 216.67,
-            totalAmount: 1299.99
           }
         ],
         protection: {
@@ -58,147 +89,89 @@ const SAMPLE_DATA = {
           }
         ]
       }
-    },
-    {
-      id: "card_2",
-      type: "Travel Elite",
-      network: "Visa",
-      last4: "8901",
-      isDefault: false,
-      benefits: {
-        cashback: null,
-        points: 3,
-        installments: [
-          { 
-            months: 3, 
-            interest: 0.0899,
-            processingFee: 25,
-            minAmount: 500,
-            monthlyAmount: 449.99,
-            totalAmount: 1349.99
-          }
-        ],
-        protection: {
-          extended_warranty: {
-            duration: "2 years extra",
-            coverage: "Triples manufacturer warranty"
-          }
-        },
-        special_offers: [
-          {
-            type: "Points Bonus",
-            description: "3x points on electronics",
-            validity: "Ongoing"
-          }
-        ]
-      }
     }
   ]
 };
 
-function MobileDeviceDemo() {
-  const [selectedCard, setSelectedCard] = useState(SAMPLE_DATA.cards.find(card => card.isDefault)?.id);
-  const [currentView, setCurrentView] = useState('main');
-  const [activeCard, setActiveCard] = useState(null);
+const MobileDeviceDemo: React.FC = () => {
+  const [selectedCard, setSelectedCard] = useState<string | undefined>(
+    SAMPLE_DATA.cards.find(card => card.isDefault)?.id
+  );
+  const [currentView, setCurrentView] = useState<ViewType>('main');
+  const [activeCard, setActiveCard] = useState<Card | null>(null);
 
-  const formatCurrency = (amount) => {
+  const formatCurrency = (amount: number): string => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
     }).format(amount);
   };
 
-  const handleCardClick = (card) => {
+  const handleCardClick = (card: Card): void => {
     setSelectedCard(card.id);
     setActiveCard(card);
     setCurrentView('details');
   };
 
-  const handlePaymentClick = () => {
+  const handlePaymentClick = (): void => {
     setCurrentView('success');
   };
 
-  const handleBackToMain = () => {
+  const handleBackToMain = (): void => {
     setCurrentView('main');
   };
 
-  const renderCardDetails = (card) => {
-    return (
-      <div className="space-y-4 px-1">
-        <div className="space-y-3">
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center text-sm font-medium text-gray-600">
-              <DollarSign className="w-4 h-4 mr-1 text-green-500" />
-              Rewards Value
-            </div>
-            <p className="mt-1 text-lg font-semibold">
-              {card.benefits.cashback 
-                ? formatCurrency(SAMPLE_DATA.transaction.amount * card.benefits.cashback)
-                : `${Math.floor(SAMPLE_DATA.transaction.amount * card.benefits.points)} points`
-              }
-            </p>
-          </div>
-          
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center text-sm font-medium text-gray-600">
-              <Shield className="w-4 h-4 mr-1 text-blue-500" />
-              Protection
-            </div>
-            <p className="mt-1 text-sm">
-              {card.benefits.protection.extended_warranty.duration} warranty
-            </p>
-          </div>
+  const renderCardDetails = (card: Card): JSX.Element => (
+    <div className="space-y-4 px-1">
+      <div className="p-3 bg-gray-50 rounded-lg">
+        <div className="flex items-center text-sm font-medium text-gray-600">
+          <DollarSign className="w-4 h-4 mr-1 text-green-500" />
+          Rewards Value
         </div>
-
-        <div className="p-3 bg-gray-50 rounded-lg">
+        <p className="mt-1 text-lg font-semibold">
+          {card.benefits.cashback 
+            ? formatCurrency(SAMPLE_DATA.transaction.amount * card.benefits.cashback)
+            : `${Math.floor(SAMPLE_DATA.transaction.amount * (card.benefits.points || 0))} points`
+          }
+        </p>
+      </div>
+      
+      {card.benefits.installments.map((plan) => (
+        <div key={plan.months} className="p-3 bg-gray-50 rounded-lg">
           <div className="flex items-center mb-2">
             <Calendar className="w-4 h-4 mr-2 text-orange-500" />
-            <p className="font-medium">Available Installments</p>
+            <p className="font-medium">{plan.months} months</p>
           </div>
-          {card.benefits.installments.map((plan) => (
-            <div key={plan.months} className="ml-6 mt-2 text-sm">
-              <div className="flex justify-between">
-                <span>{plan.months} months</span>
-                <span className="font-medium">{formatCurrency(plan.monthlyAmount)}/mo</span>
-              </div>
-            </div>
-          ))}
+          <p className="ml-6 font-medium">
+            {formatCurrency(plan.monthlyAmount)}/mo
+          </p>
         </div>
+      ))}
 
-        {card.benefits.special_offers.length > 0 && (
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center mb-2">
-              <Tag className="w-4 h-4 mr-2 text-purple-500" />
-              <p className="font-medium">Special Offers</p>
-            </div>
-            {card.benefits.special_offers.map((offer, index) => (
-              <div key={index} className="ml-6 text-sm">
-                <p className="font-medium">{offer.description}</p>
-                <p className="text-gray-600">Valid: {offer.validity}</p>
-              </div>
-            ))}
+      {card.benefits.special_offers.map((offer, index) => (
+        <div key={index} className="p-3 bg-gray-50 rounded-lg">
+          <div className="flex items-center mb-2">
+            <Tag className="w-4 h-4 mr-2 text-purple-500" />
+            <p className="font-medium">{offer.description}</p>
           </div>
-        )}
-      </div>
-    );
-  };
+          <p className="ml-6 text-sm text-gray-600">
+            Valid: {offer.validity}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
 
-  function renderContent() {
+  const renderContent = (): JSX.Element => {
     if (currentView === 'success') {
       return (
-        <div className="h-[calc(100vh-10rem)] flex flex-col items-center justify-center px-4 bg-white">
+        <div className="h-full flex flex-col items-center justify-center px-4">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-6">
             <Check className="w-8 h-8 text-green-600" />
           </div>
           <h2 className="text-2xl font-bold mb-2">Payment Successful!</h2>
-          <p className="text-gray-600 mb-2">
-            Your payment of {formatCurrency(SAMPLE_DATA.transaction.amount)} has been processed.
-          </p>
-          <p className="text-gray-500 text-sm mb-8">
-            Transaction ID: {Math.random().toString(36).substr(2, 9).toUpperCase()}
-          </p>
           <button 
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+            className="mt-8 w-full py-3 px-4 bg-blue-600 text-white rounded-lg"
             onClick={handleBackToMain}
           >
             Back to Home
@@ -209,8 +182,8 @@ function MobileDeviceDemo() {
 
     if (currentView === 'details') {
       return (
-        <div className="h-[calc(100vh-10rem)] overflow-y-auto bg-white">
-          <div className="border-b sticky top-0 bg-white z-10">
+        <div className="h-full overflow-y-auto">
+          <div className="sticky top-0 bg-white border-b">
             <div className="flex items-center p-4">
               <button 
                 className="p-2 hover:bg-gray-100 rounded-lg mr-2"
@@ -221,7 +194,7 @@ function MobileDeviceDemo() {
               <h2 className="font-semibold">{activeCard?.type} Details</h2>
             </div>
           </div>
-          <div className="p-4 pb-20">
+          <div className="p-4">
             {activeCard && renderCardDetails(activeCard)}
           </div>
         </div>
@@ -229,74 +202,22 @@ function MobileDeviceDemo() {
     }
 
     return (
-      <div className="relative h-[calc(100vh-10rem)]">
-        <div className="h-full overflow-y-auto">
-          <div className="border-b">
-            <div className="pt-6 px-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-lg font-semibold">{SAMPLE_DATA.transaction.merchant.name}</h3>
-                  <p className="text-sm text-gray-600">{SAMPLE_DATA.transaction.merchant.category}</p>
-                  <div className="mt-2 text-2xl font-bold">
-                    {formatCurrency(SAMPLE_DATA.transaction.amount)}
-                  </div>
-                </div>
-                {SAMPLE_DATA.transaction.merchant.special_offers?.length > 0 && (
-                  <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-                    Offers
-                  </span>
-                )}
-              </div>
-            </div>
+      <div className="h-full relative">
+        <div className="h-full overflow-y-auto pb-20">
+          <div className="p-4 border-b">
+            <h3 className="text-lg font-semibold">{SAMPLE_DATA.transaction.merchant.name}</h3>
+            <p className="text-2xl font-bold mt-2">
+              {formatCurrency(SAMPLE_DATA.transaction.amount)}
+            </p>
           </div>
 
-          {/* Quick Benefits Preview */}
-          {selectedCard && (
-            <div className="px-4 py-3 bg-gray-50">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-gray-600">Selected Card Benefits</h3>
-                <button 
-                  className="text-blue-600 text-sm hover:underline"
-                  onClick={() => handleCardClick(SAMPLE_DATA.cards.find(c => c.id === selectedCard))}
-                >
-                  View Details
-                </button>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-white p-3 rounded-lg">
-                  <div className="flex items-center mb-1">
-                    <DollarSign className="w-4 h-4 text-green-500 mr-1" />
-                    <span className="text-sm">You'll Earn</span>
-                  </div>
-                  <p className="font-bold text-green-600">
-                    {selectedCard && SAMPLE_DATA.cards.find(c => c.id === selectedCard)?.benefits.cashback 
-                      ? formatCurrency(SAMPLE_DATA.transaction.amount * SAMPLE_DATA.cards.find(c => c.id === selectedCard)?.benefits.cashback)
-                      : `${Math.floor(SAMPLE_DATA.transaction.amount * (SAMPLE_DATA.cards.find(c => c.id === selectedCard)?.benefits.points || 0))} points`
-                    }
-                  </p>
-                </div>
-
-                <div className="bg-white p-3 rounded-lg">
-                  <div className="flex items-center mb-1">
-                    <Calendar className="w-4 h-4 text-orange-500 mr-1" />
-                    <span className="text-sm">Split Pay</span>
-                  </div>
-                  <p className="font-bold">
-                    {SAMPLE_DATA.cards.find(c => c.id === selectedCard)?.benefits.installments[0].months} months
-                    <span className="text-sm font-normal text-gray-600 ml-1">available</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="px-4 mt-6 pb-24">
+          <div className="p-4">
             <h2 className="text-lg font-semibold mb-4">Select Payment Method</h2>
             <div className="space-y-3">
               {SAMPLE_DATA.cards.map((card) => (
                 <div 
                   key={card.id}
-                  className={`p-4 border rounded-lg cursor-pointer transition-all ${
+                  className={`p-4 border rounded-lg cursor-pointer ${
                     selectedCard === card.id ? 'ring-2 ring-blue-500' : ''
                   }`}
                   onClick={() => handleCardClick(card)}
@@ -323,7 +244,7 @@ function MobileDeviceDemo() {
 
         <div className="absolute bottom-0 inset-x-0 p-4 bg-white border-t">
           <button 
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium"
+            className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg font-medium"
             onClick={handlePaymentClick}
           >
             Pay {formatCurrency(SAMPLE_DATA.transaction.amount)}
@@ -331,21 +252,18 @@ function MobileDeviceDemo() {
         </div>
       </div>
     );
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="w-[393px] h-[852px] bg-black rounded-[55px] shadow-xl overflow-hidden relative border-8 border-black">
-        {/* Dynamic Island */}
+      <div className="w-[393px] h-[852px] bg-black rounded-[55px] overflow-hidden relative border-8 border-black">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[35px] w-[126px] bg-black rounded-b-[18px] z-50 mt-2">
           <div className="absolute top-[10px] w-[90px] h-[9px] bg-neutral-900 rounded-[18px] left-1/2 -translate-x-1/2" />
           <div className="absolute right-[22px] top-[7px] w-[13px] h-[13px] rounded-full bg-neutral-950" />
         </div>
 
-        {/* Screen Content */}
         <div className="h-full w-full bg-white rounded-[45px] overflow-hidden">
-          {/* Status Bar */}
-          <div className="h-12 bg-white flex items-center justify-between px-6 pt-2">
+          <div className="h-12 flex items-center justify-between px-6 pt-2">
             <div className="text-sm font-medium">9:41</div>
             <div className="flex items-center space-x-2">
               <Signal className="w-4 h-4" />
@@ -354,17 +272,14 @@ function MobileDeviceDemo() {
             </div>
           </div>
 
-          {/* Main Content */}
-          <div className="relative h-[calc(100%-3rem)] bg-white">
+          <div className="relative h-[calc(100%-3rem)]">
             {renderContent()}
-            
-            {/* Home Indicator */}
             <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-[134px] h-[5px] bg-neutral-200 rounded-full" />
           </div>
         </div>
       </div>
     </div>
   );
-}
+};
 
 export default MobileDeviceDemo;
