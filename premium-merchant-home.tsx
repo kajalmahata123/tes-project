@@ -135,12 +135,12 @@ const CategoryCard: React.FC<{ category: Category }> = ({ category }) => {
     <button
       className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-gray-50 to-white p-5 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 border border-gray-100"
     >
-      <div className="relative z-10">
+      <div className="relative z-10 flex flex-col items-center text-center">
         <div className={`w-14 h-14 bg-gradient-to-br ${category.gradient} rounded-2xl flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
           <Icon className="w-7 h-7 text-white" />
         </div>
         
-        <div className="space-y-2">
+        <div className="space-y-2 w-full">
           <h3 className="text-xl font-bold text-gray-900">{category.name}</h3>
           <p className="text-sm text-gray-600 line-clamp-2">{category.description}</p>
           
