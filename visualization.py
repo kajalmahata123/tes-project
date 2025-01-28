@@ -1,21 +1,82 @@
-# features/data_analysis/models.py
+from fastapi import APIRouter, HTTPException, Depends, status
+from typing import Dict, List, Optional
 from pydantic import BaseModel
-from typing import List, Dict, Optional
+import pandas as pd
 
-class VisualizationConfig(BaseModel):
-    type: str
-    data: List[Dict]
-    title: str
-    x_axis: str
-    y_axis: str
-    options: Optional[Dict] = None
+from smart_ql.features.data_analysis.services.analyzer import AdvancedDataAnalyzer
+from smart_ql.features.data_analysis.services.visualization import AdvancedVisualizationService
+
+data_analysis_router = APIRouter()
+
 
 class AnalysisRequest(BaseModel):
-    query_results: List[Dict]
+    data: List[Dict]
     analysis_type: str = 'comprehensive'
-    include_visualizations: bool = True
+    visualization_types: Optional[List[str]] = None
 
-class AnalysisResponse(BaseModel):
-    eda_results: Dict
-    visualizations: List[VisualizationConfig]
-    deep_insights: Dict
+
+class DataResponse(BaseModel):
+    analysis_results: Dict
+    visualizations: List[Dict]
+
+
+@data_analysis_router.post("/analyze", response_model=DataResponse)
+async def analyze_data(
+        request: AnalysisRequest,
+        analyzer: AdvancedDataAnalyzer = Depends(),
+        viz_service: AdvancedVisualizationService = Depends()
+) -> Dict:
+    try:
+        df = pd.DataFrame(request.data)
+
+        analysis_results = await analyzer.analyze_data(
+            df=df,
+            analysis_type=request.analysis_type
+        )
+
+        visualizations = []
+        if request.visualization_types:
+            for viz_type in request.visualization_types:
+                viz_config = viz_service.prepare_visualization(
+                    df=df,
+                    chart_type=viz_type,
+                    config=analysis_results.get('visualization_config', {})
+                )
+                visualizations.append(viz_config)
+
+        return {
+            "analysis_results": analysis_results,
+            "visualizations": visualizations
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+
+@data_analysis_router.post("/visualize")
+async def get_visualizations(
+        request: AnalysisRequest,
+        viz_service: AdvancedVisualizationService = Depends()
+) -> Dict:
+    try:
+        df = pd.DataFrame(request.data)
+        visualizations = []
+
+        for viz_type in request.visualization_types or ['bar', 'line']:
+            viz_config = viz_service.prepare_visualization(
+                df=df,
+                chart_type=viz_type,
+                config={}
+            )
+            visualizations.append(viz_config)
+
+        return {"visualizations": visualizations}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
