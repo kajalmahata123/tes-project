@@ -1,137 +1,75 @@
-from dataclasses import dataclass, asdict
-from datetime import datetime
-from typing import List, Dict, Any, Optional, TypedDict
-from enum import Enum
-import logging
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from typing import Dict
+
+from chromadb.api.models.Collection import Collection
 
 
-class QueryComplexity(Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
+class SchemaAwareRepository:
+    def __init__(self, chroma_collection: Collection):
+        self.collection = chroma_collection
 
-
-@dataclass
-class QueryData:
-    natural_language_query: str
-    sql_query: str
-    execution_time: float
-    execution_plan: str
-    insights: str
-    timestamp: datetime
-    schema_context: Optional[Dict] = None
-
-    def to_dict(self):
-        return asdict(self)
-
-
-class QueryMetrics(TypedDict):
-    avg_execution_time: float
-    complexity_score: float
-    table_usage_frequency: Dict[str, int]
-    join_patterns: List[Dict[str, Any]]
-
-
-class QueryHistoryRepository:
-    def __init__(self, db_session: Session):
-        self.db = db_session
-
-    async def get_historical_queries(
+    async def get_schema_context(
             self,
             user_id: str,
             connection_id: str,
-            time_window: Optional[int] = 30,
-            limit: int = 50
-    ) -> List[QueryData]:
+            schema_name: str = None,
+            query: str = "",
+            include_embeddings: bool = False
+    ) -> Dict:
         try:
-            query = """
-            SELECT 
-                natural_language_query,
-                sql_query,
-                execution_time,
-                execution_plan,
-                insights,
-                timestamp
-            FROM query_history
-            WHERE 
-                user_id = :user_id 
-                AND connection_id = :connection_id
-                AND timestamp >= CURRENT_DATE - :days::interval
-            ORDER BY timestamp DESC
-            LIMIT :limit
-            """
+            where_clause = {
+                "$and": [
+                    {"user_id": {"$eq": user_id}},
+                    {"connection_id": {"$eq": connection_id}}
+                ]
+            }
 
-            result = self.db.execute(
-                query,
-                {
-                    "user_id": user_id,
-                    "connection_id": connection_id,
-                    "days": f"{time_window} days",
-                    "limit": limit
-                }
-            )
+            if schema_name:
+                where_clause["$and"].append({"schema_name": {"$eq": schema_name}})
 
-            queries = []
-            for row in result.fetchall():
-                schema_context = await self.get_schema_context(
-                    user_id,
-                    connection_id,
-                    row.natural_language_query
+            if query:
+                include = ["documents", "metadatas", "distances"]
+                if include_embeddings:
+                    include.append("embeddings")
+
+                results = self.collection.query(
+                    query_texts=[query],
+                    where=where_clause,
+                    n_results=5,
+                    include=include
                 )
-                queries.append(QueryData(
-                    **row._mapping,
-                    schema_context=schema_context
-                ))
+            else:
+                results = self.collection.get(
+                    where=where_clause,
+                    include=["documents", "metadatas"]
+                )
 
-            return queries
+            schema_context = {
+                "tables": [],
+                "relationships": []
+            }
 
-        except SQLAlchemyError as e:
-            logger.error(f"Database error: {str(e)}")
-            raise
-        except Exception as e:
-            logger.error(f"Unexpected error: {str(e)}")
-            raise
+            documents = results['documents'][0] if query else results['documents']
+            metadatas = results['metadatas'][0] if query else results['metadatas']
+            distances = results.get('distances', [[0] * len(documents)])[0] if query else [0] * len(documents)
 
-    async def save_query(self, query_data: QueryData, user_id: str, connection_id: str):
-        try:
-            query = """
-            INSERT INTO query_history (
-                user_id,
-                connection_id,
-                natural_language_query,
-                sql_query,
-                execution_time,
-                execution_plan,
-                insights,
-                timestamp
-            ) VALUES (
-                :user_id,
-                :connection_id,
-                :natural_language_query,
-                :sql_query,
-                :execution_time,
-                :execution_plan,
-                :insights,
-                :timestamp
-            )
-            """
+            for i, doc in enumerate(documents):
+                metadata = metadatas[i]
+                distance = distances[i]
 
-            self.db.execute(
-                query,
-                {
-                    "user_id": user_id,
-                    "connection_id": connection_id,
-                    **query_data.to_dict()
+                result_item = {
+                    "content": doc,
+                    "metadata": metadata,
+                    "relevance": 1.0 - (distance / 2) if query else 1.0
                 }
-            )
-            self.db.commit()
+
+                if include_embeddings and 'embeddings' in results:
+                    result_item["embedding"] = results['embeddings'][0][i]
+
+                element_type = metadata['type']
+                schema_context[f"{element_type}s"].append(result_item)
+
+            return schema_context
 
         except Exception as e:
-            self.db.rollback()
-            logger.error(f"Error saving query: {str(e)}")
+            #logger.error(f"Error getting schema context: {str(e)}")
             raise
