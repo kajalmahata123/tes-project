@@ -1,81 +1,124 @@
-from typing import Optional, List, Dict
+# app/schemas/schema_extractor.py
+from pydantic import BaseModel
+from typing import Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import SQLAlchemyError
-from smart_ql.features.schema_analyzer.entity.schema_analysis_entity import SchemaAnalysisEntity, \
-    TableAnalysisEntity
+from smart_ql.assistants.sql_assistant.config.db_config import DBConfig
+from smart_ql.features.schema_analyzer.schema_analyzer import SchemaAnalyzer, SchemaAnalysisResponse
+from smart_ql.assistants.sql_assistant.schema_extractors.mysql_extractor import MySQLSchemaExtractor
+from smart_ql.db.database import get_db
+from smart_ql.features.data_source.repositories.data_source_entity import DatabaseVendor
+from smart_ql.features.data_source.services.datasource_service import DatabaseService
 
 
-class SchemaAnalysisRepository:
-    """
-    Repository class for handling schema analysis operations in the database.
-    """
 
-    def __init__(self, db: Session):
-        """
-        Initialize the repository with a database session.
 
-        :param db: SQLAlchemy Session object for database operations.
-        """
-        self.db = db
 
-    def create_analysis(self, connection_id: int, schema_name: str, schema_analysis: str,
-                        table_analyses: List[Dict[str, str]]) -> SchemaAnalysisEntity:
-        """
-        Create a new schema analysis and associated table analyses in the database.
+class SchemaExtractionResponse(BaseModel):
+    schema: Dict[str, Any]
+    message: str = "Schema extracted successfully"
 
-        :param connection_id: ID of the database connection.
-        :param schema_name: Name of the schema being analyzed.
-        :param schema_analysis: Analysis result of the schema.
-        :param table_analyses: List of table analysis results, each containing table name and analysis.
-        :return: The created SchemaAnalysisEntity object.
-        :raises SQLAlchemyError: If there is an error during the database operation.
-        """
-        try:
-            # Create schema analysis
-            schema_analysis_entity = SchemaAnalysisEntity(
-                connection_id=connection_id,
-                schema_name=schema_name,
-                schema_analysis=schema_analysis,
-                status='completed'
+
+schema_extraction_router = APIRouter()
+
+
+@schema_extraction_router.get("/{connection_id}", response_model=SchemaAnalysisResponse)
+async def extract_database_schema(
+        connection_id: int,
+        db: Session = Depends(get_db)
+):
+    """Extract database schema for a given connection"""
+    try:
+        # Get the database connection
+        service = DatabaseService(db)
+        connection = service.get_connection(connection_id)
+
+        if not connection:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Database connection not found: {connection_id}"
             )
-            self.db.add(schema_analysis_entity)
-            self.db.flush()  # Flush to get the schema_analysis_id
 
-            # Create table analyses
-            for table_analysis in table_analyses:
-                table_analysis_entity = TableAnalysisEntity(
-                    schema_analysis_id=schema_analysis_entity.id,
-                    table_name=table_analysis['table_name'],
-                    analysis=table_analysis['analysis']
-                )
-                self.db.add(table_analysis_entity)
+        # Create config from connection details
+        config = DBConfig(
+            vendor=connection.vendor.value,
+            host=connection.config.host,
+            port=connection.config.port,
+            database=connection.config.database_name,
+            username=connection.credentials.username,
+            password=connection.credentials.password
+        )
 
-            self.db.commit()
-            return schema_analysis_entity
+        # Extract schema based on vendor
+        if connection.vendor == DatabaseVendor.MYSQL:
+            extractor = MySQLSchemaExtractor(config)
+            schema = await extractor.extract_schema()
+            print('Schema Fetched Successfully')
 
-        except SQLAlchemyError as e:
-            self.db.rollback()
-            raise e
+            analyzer = SchemaAnalyzer()
+            analysis = await analyzer.analyze_schema(schema)
 
-    def get_latest_analysis(self, connection_id: int) -> Optional[SchemaAnalysisEntity]:
-        """
-        Retrieve the latest schema analysis for a given connection ID.
+            return analysis
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported database vendor: {connection.vendor}"
+            )
 
-        :param connection_id: ID of the database connection.
-        :return: The latest SchemaAnalysisEntity object or None if not found.
-        """
-        return self.db.query(SchemaAnalysisEntity)\
-            .filter(SchemaAnalysisEntity.connection_id == connection_id)\
-            .order_by(SchemaAnalysisEntity.analyzed_at.desc())\
-            .first()
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to extract schema: {str(e)}"
+        )
 
-    def get_table_analyses(self, schema_analysis_id: int) -> List[TableAnalysisEntity]:
-        """
-        Retrieve all table analyses for a given schema analysis ID.
 
-        :param schema_analysis_id: ID of the schema analysis.
-        :return: List of TableAnalysisEntity objects.
-        """
-        return self.db.query(TableAnalysisEntity)\
-            .filter(TableAnalysisEntity.schema_analysis_id == schema_analysis_id)\
-            .all()
+# Optional: Add endpoint to extract schema using direct connection details
+@schema_extraction_router.post("/analysis/direct", response_model=SchemaAnalysisResponse)
+async def extract_schema_direct(
+        config: DBConfig
+):
+    """Extract database schema using direct connection details"""
+    try:
+        if config.vendor.lower() == "mysql":
+            extractor = MySQLSchemaExtractor(config)
+            schema = await extractor.extract_schema()
+            analyzer = SchemaAnalyzer()
+            analysis = await analyzer.analyze_schema(schema)
+            return analysis
+        if config.vendor.lower() == "oracle":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"SQL Server schema extraction not supported yet")
+
+        if config.vendor.lower() == "sqlserver":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"SQL Server schema extraction not supported yet")
+        if config.vendor.lower() == "postgres":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Postgres schema extraction not supported yet")
+        if config.vendor.lower() == "sqlite":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"SQLite schema extraction not supported yet")
+        if config.vendor.lower() == "db2":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Oracle schema extraction not supported yet")
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported database vendor: {config.vendor}"
+            )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to extract schema: {str(e)}"
+        )
