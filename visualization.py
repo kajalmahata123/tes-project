@@ -1,332 +1,185 @@
-import hashlib
-import json
-import chromadb
-from chromadb.api.types import Documents, EmbeddingFunction
-from chromadb.config import Settings
-import numpy as np
-from typing import List, Dict
-import re
-class BasicEmbeddingFunction(EmbeddingFunction):
-    def __init__(self, dimension: int = 512):
-        self.dimension = dimension
-        self.word_vectors = {}
+# main.py
+import logging
+from contextlib import asynccontextmanager
+import uvicorn
+from sqlalchemy import text
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from config import settings
+from smart_ql.features.data_analysis.route.analysis_routes import data_analysis_router
+from smart_ql.features.document_generator.route.ai_document_route import document_router
+from smart_ql.features.query_intent.route.query_intent_route import intent_router
+from smart_ql.features.query_suggestion.route.history import history_router
+from smart_ql.features.query_suggestion.route.recomendation import query_recomendation_router
+from smart_ql.features.schema_analyzer.routes.schema_analysis_endpoint import schema_extraction_router
+from smart_ql.db.database import engine
+from smart_ql.features.auth.api.auth import user_router
+from smart_ql.features.data_source.routes.data_source_endpoint import datasource_router
+from smart_ql.features.semantic_search.store_search_api import store_search_router
+from smart_ql.routes.health import health_router
 
-    def _tokenize(self, text: str) -> List[str]:
-        text = text.lower()
-        words = re.findall(r'\w+', text)
-        return words
+# Configure logging
+logging.basicConfig(
+    level=settings.LOG_LEVEL,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-    def _hash_word(self, word: str) -> np.ndarray:
-        if word not in self.word_vectors:
-            seed = int(hashlib.md5(word.encode()).hexdigest(), 16) % (2 ** 32)
-            np.random.seed(seed)
-            self.word_vectors[word] = np.random.randn(self.dimension)
-        return self.word_vectors[word]
 
-    def __call__(self, texts: Documents) -> List[List[float]]:
-        embeddings = []
-        for text in texts:
-            if not text:
-                embeddings.append([0.0] * self.dimension)
-                continue
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager for startup and shutdown events"""
+    # Startup: Execute when the server starts
+    logger.info("Starting up application...")
+    try:
+        # Test database connection
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+            logger.info("Database connection successful!")
+    except Exception as e:
+        logger.error(f"Database connection failed: {str(e)}")
+        raise
 
-            words = self._tokenize(str(text))
-            if not words:
-                embeddings.append([0.0] * self.dimension)
-                continue
+    yield  # Server is running and handling requests
 
-            vectors = np.array([self._hash_word(word) for word in words])
-            embedding = np.mean(vectors, axis=0)
+    # Shutdown: Execute when the server stops
+    logger.info("Shutting down application...")
+    try:
+        await engine.dispose()
+        logger.info("Database connection closed successfully")
+    except Exception as e:
+        logger.error(f"Error closing database connection: {str(e)}")
 
-            norm = float(np.linalg.norm(embedding))
-            if norm > 0:
-                embedding = embedding / norm
 
-            embeddings.append(embedding.tolist())
-        return embeddings
-class SchemaStore:
-    """Store and search schema using basic embeddings."""
-
-    def __init__(self):
-        """Initialize with basic embedding function."""
-        self.client = chromadb.Client(Settings(
-            persist_directory='/Users/kajalmahata/smart_QL/chroma_data',
-            anonymized_telemetry=False,
-            allow_reset=True,
-            is_persistent=True
-        ))
-
-        # Use our basic embedding function
-        self.embedding_function = BasicEmbeddingFunction()
-
-        # Create collection
-        self.collection = self.client.get_or_create_collection(
-            name="schema_metadata",
-            embedding_function=self.embedding_function
+async def catch_exceptions_middleware(request, call_next):
+    """Global exception handler middleware"""
+    try:
+        return await call_next(request)
+    except HTTPException as e:
+        logger.warning(f"HTTP Exception: {str(e)}")
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"detail": e.detail}
+        )
+    except Exception as e:
+        logger.error(f"Unhandled exception: {str(e)}", exc_info=True)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": "Internal server error"}
         )
 
-    def _create_table_text(self, table: Dict, schema_name: str) -> str:
-        """Create searchable text for table."""
-        columns_info = []
-        for col in table['columns']:
-            # Basic column info
-            col_info = f"{col['name']} ({col['data_type']})"
 
-            # Check for primary key
-            if col.get('is_primary_key', False):
-                col_info += " [PK]"
+def create_application() -> FastAPI:
+    """Create and configure the FastAPI application"""
+    app = FastAPI(
+        title=settings.PROJECT_NAME,
+        version=settings.VERSION,
+        docs_url=f"{settings.API_V1_STR}/docs",
+        redoc_url=f"{settings.API_V1_STR}/redoc",
+        lifespan=lifespan,
+        openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    )
 
-            # Check if column name is in foreign keys
-            if table.get('foreign_keys', {}).get(col['name']):
-                col_info += f" [FK -> {table['foreign_keys'][col['name']]}]"
+    # Add middlewares
+    app.middleware("http")(catch_exceptions_middleware)
 
-            columns_info.append(col_info)
+    # CORS middleware
+    #if settings.BACKEND_CORS_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        #allow_origins=[str(origin) for origin in settings.BACKEND_CORS_ORIGINS],
+        allow_origins=["http://localhost:3000"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
-        return f"""
-        TABLE: {table['name']}
-        DATABASE: {schema_name}
-        SCHEMA: {table.get('db_schema', schema_name)}
-        COLUMNS: {', '.join(columns_info)}
-        PRIMARY KEYS: {', '.join(table.get('primary_keys', []))}
-        FOREIGN KEYS: {json.dumps(table.get('foreign_keys', {}))}
-        DESCRIPTION: Table for managing {table['name'].replace('_', ' ')} data
-        """
+    # Trusted Host middleware
 
-    async def store_schema(self, schema: Dict, user_id: str, connection_id: str):
-        """Store schema information."""
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=settings.ALLOWED_HOSTS
+    )
+    app.include_router(
+        health_router,
+        prefix="/health",
+        tags=["Health Check"]
+    )
+    # Register routers
+    app.include_router(
+        user_router,
+        prefix=settings.API_V1_STR,
+        tags=["Authentication"]
+    )
+    app.include_router(
+        datasource_router,
+        prefix=settings.API_V1_STR+"/datasources",
+        tags=["Data Sources"]
+    )
+    app.include_router(
+        schema_extraction_router,
+        prefix=settings.API_V1_STR + "/schema/analysis",
+        tags=["Schema Analysis"])
+    app.include_router(
+        store_search_router,
+        prefix=settings.API_V1_STR + "/vectorstore",
+        tags=["Vector Store and Search And Query Generation"])
+    app.include_router(
+        intent_router,
+        prefix=settings.API_V1_STR + "/query-analysis",
+        tags=["Intent Analysis"])
+    app.include_router(
+        document_router,
+        prefix=settings.API_V1_STR + "/document",
+        tags=["Document"])
+    app.include_router(
+        query_recomendation_router,
+        prefix=settings.API_V1_STR,
+        tags=["Query Recommendation"]
+    )
+    app.include_router(
+        history_router,
+        prefix=settings.API_V1_STR,
+        tags=["Query History"]
+    )
+    app.include_router(
+        data_analysis_router,
+        prefix=settings.API_V1_STR,
+        tags=["Data Analysis"]
+    )
+
+    return app
+
+
+def start_server():
+    """Start the uvicorn server with port retry logic"""
+    ports = settings.ALTERNATE_PORTS
+    for port in ports:
         try:
-            documents = []
-            metadatas = []
-            ids = []
-
-            # Process tables
-            for table in schema['tables']:
-                # Store table information
-                table_doc = self._create_table_text(table, schema['name'])
-                table_id = hashlib.md5(
-                    f"table_{user_id}_{connection_id}_{table['name']}".encode()
-                ).hexdigest()
-
-                table_metadata = {
-                    "type": "table",
-                    "user_id": user_id,
-                    "connection_id": connection_id,
-                    "database": schema['name'],
-                    "table_name": table['name']
-                }
-
-                documents.append(table_doc)
-                ids.append(table_id)
-                metadatas.append(table_metadata)
-
-            # Process relationships
-            for rel in schema.get('relationships', []):
-                rel_doc = f"""
-                RELATIONSHIP:
-                SOURCE: {rel['source_table']}.{rel['source_column']}
-                TARGET: {rel['target_table']}.{rel['target_column']}
-                TYPE: {rel.get('type', 'unknown')}
-                """
-
-                rel_id = hashlib.md5(
-                    f"rel_{user_id}_{connection_id}_{rel['source_table']}_{rel['target_table']}".encode()
-                ).hexdigest()
-
-                rel_metadata = {
-                    "type": "relationship",
-                    "user_id": user_id,
-                    "connection_id": connection_id,
-                    "database": schema['name'],
-                    "source_table": rel['source_table'],
-                    "target_table": rel['target_table']
-                }
-
-                documents.append(rel_doc)
-                ids.append(rel_id)
-                metadatas.append(rel_metadata)
-
-            # Store in ChromaDB
-            self.collection.add(
-                documents=documents,
-                metadatas=metadatas,
-                ids=ids
+            logger.info(f"Attempting to start server on port {port}...")
+            uvicorn.run(
+                "main:app",
+                host=settings.HOST,
+                port=port,
+                reload=settings.DEBUG,
+                lifespan="on",
+                log_level=settings.LOG_LEVEL.lower(),
+                access_log=settings.ACCESS_LOG
             )
-
-            print(f"Successfully stored {len(documents)} schema elements")
-
-        except Exception as e:
-            print(e)
-            print(f"Error storing schema: {str(e)}")
-            raise
-
-        async def search_schema(
-                self,
-                query: str,
-                user_id: str,
-                connection_id: str,
-                n_results: int = 5,
-                include_embeddings: bool = False
-        ) -> Dict[str, List[Dict]]:
-            try:
-                where_clause = {
-                    "$and": [
-                        {"user_id": {"$eq": user_id}},
-                        {"connection_id": {"$eq": connection_id}}
-                    ]
-                }
-
-                all_docs = self.collection.get(where=where_clause)
-                total_docs = len(all_docs['ids'])
-
-                if total_docs == 0:
-                    return {"tables": [], "relationships": []}
-
-                n_results = min(n_results, total_docs)
-                include = ["documents", "metadatas", "distances"]
-                if include_embeddings:
-                    include.append("embeddings")
-
-                results = self.collection.query(
-                    query_texts=[query],
-                    where=where_clause,
-                    n_results=n_results,
-                    include=include
-                )
-
-                schema_context = {
-                    "tables": [],
-                    "relationships": []
-                }
-
-                if results['documents'] and results['documents'][0]:
-                    for i in range(len(results['documents'][0])):
-                        metadata = results['metadatas'][0][i]
-                        content = results['documents'][0][i]
-                        distance = float(results['distances'][0][i])
-
-                        result_item = {
-                            "content": content,
-                            "metadata": metadata,
-                            "relevance": float(1.0 - (distance / 2))
-                        }
-
-                        if include_embeddings and 'embeddings' in results:
-                            result_item["embedding"] = results['embeddings'][0][i]
-
-                        element_type = metadata['type']
-                        schema_context[f"{element_type}s"].append(result_item)
-
-                return schema_context
-
-            except Exception as e:
-                print(f"Error searching schema: {str(e)}")
+            break
+        except OSError as e:
+            if port == ports[-1]:
+                logger.error(f"All ports are in use. Last error: {str(e)}")
                 raise
-
-    async def get_schema(
-            self,
-            user_id: str,
-            connection_id: str,
-            schema_name: str = None
-    ) -> Dict[str, List[Dict]]:
-        try:
-            where_clause = {
-                "$and": [
-                    {"user_id": {"$eq": user_id}},
-                    {"connection_id": {"$eq": connection_id}}
-                ]
-            }
-
-            if schema_name:
-                where_clause["$and"].append({"schema_name": {"$eq": schema_name}})
-
-            all_docs = self.collection.get(where=where_clause)
-            total_docs = len(all_docs['ids'])
-
-            if total_docs == 0:
-                return {"tables": [], "relationships": []}
-
-            schema_context = {
-                "tables": [],
-                "relationships": []
-            }
-
-            for i in range(total_docs):
-                metadata = all_docs['metadatas'][i]
-                content = all_docs['documents'][i]
-
-                result_item = {
-                    "content": content,
-                    "metadata": metadata
-                }
-
-                element_type = metadata['type']
-                schema_context[f"{element_type}s"].append(result_item)
-
-            return schema_context
-
+            logger.warning(f"Port {port} is in use, trying next port...")
         except Exception as e:
-            #logger.error(f"Error getting schema: {str(e)}")
+            logger.error(f"Error starting server: {str(e)}", exc_info=True)
             raise
 
-    async def search_schema(
-            self,
-            query: str,
-            user_id: str,
-            connection_id: str,
-            n_results: int = 5,
-            include_embeddings: bool = False
-    ) -> Dict[str, List[Dict]]:
-        try:
-            where_clause = {
-                "$and": [
-                    {"user_id": {"$eq": user_id}},
-                    {"connection_id": {"$eq": connection_id}}
-                ]
-            }
 
-            all_docs = self.collection.get(where=where_clause)
-            total_docs = len(all_docs['ids'])
+app = create_application()
 
-            if total_docs == 0:
-                return {"tables": [], "relationships": []}
-
-            n_results = min(n_results, total_docs)
-            include = ["documents", "metadatas", "distances"]
-            if include_embeddings:
-                include.append("embeddings")
-
-            results = self.collection.query(
-                query_texts=[query],
-                where=where_clause,
-                n_results=n_results,
-                include=include
-            )
-
-            schema_context = {
-                "tables": [],
-                "relationships": []
-            }
-
-            if results['documents'] and results['documents'][0]:
-                for i in range(len(results['documents'][0])):
-                    metadata = results['metadatas'][0][i]
-                    content = results['documents'][0][i]
-                    distance = float(results['distances'][0][i])
-
-                    result_item = {
-                        "content": content,
-                        "metadata": metadata,
-                        "relevance": float(1.0 - (distance / 2))
-                    }
-
-                    if include_embeddings and 'embeddings' in results:
-                        result_item["embedding"] = results['embeddings'][0][i]
-
-                    element_type = metadata['type']
-                    schema_context[f"{element_type}s"].append(result_item)
-
-            return schema_context
-
-        except Exception as e:
-            print(f"Error searching schema: {str(e)}")
-            raise
+if __name__ == "__main__":
+    start_server()
