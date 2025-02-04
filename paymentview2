@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState } from 'react';
 import { 
   ArrowLeft, 
-  CreditCard, 
-  Info, 
-  CheckCircle2,
+  ChevronDown, 
+  ChevronRight,
   Gift,
   Plane,
   Coins,
@@ -19,399 +18,326 @@ const REWARD_ICONS = {
 };
 
 const PaymentView = () => {
-  const [selectedMethod, setSelectedMethod] = useState(1);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [showCardInfo, setShowCardInfo] = useState(null);
-  const [selectedRewardType, setSelectedRewardType] = useState(null);
-  const [cardRewards, setCardRewards] = useState(null);
-  const [loading, setLoading] = useState(true);
-  
-  const amount = 249.99;
-  const merchant = "Electronics Store";
-  const category = "electronics";
-  
-  const transactionId = useMemo(() => 'TXN' + Math.random().toString(36).substr(2, 9).toUpperCase(), []);
+  const [selectedCard, setSelectedCard] = useState(null);
+  const [showOrderSummary, setShowOrderSummary] = useState(false);
+  const [showRewardDetails, setShowRewardDetails] = useState(null);
 
-  useEffect(() => {
-    // Simulate API response
-    setTimeout(() => {
-      setCardRewards({
-        status: "success",
-        cards: [
-          {
-            id: 1,
-            name: "Visa Infinite",
-            network: "Visa",
-            last4: "4321",
-            rewardTypes: [
-              {
-                type: 'points',
-                details: {
-                  baseRate: "3X points per $1",
-                  bonusCategories: ["Travel: 5X", "Dining: 4X"],
-                  redemptionOptions: ["Travel Portal", "Gift Cards", "Cash"],
-                  currentBonus: "50% more points on electronics"
-                }
-              },
-              {
-                type: 'miles',
-                details: {
-                  baseRate: "2 miles per $1",
-                  partnerAirlines: ["United", "Emirates", "Singapore Airlines"],
-                  transferRatio: "1:1 transfer to partners",
-                  currentBonus: "2X miles on electronics"
-                }
-              },
-              {
-                type: 'cashback',
-                details: {
-                  baseRate: "2% on all purchases",
-                  categories: ["5% on Travel", "4% on Dining"],
-                  redemptionMin: "$25",
-                  currentBonus: "Additional 3% on electronics"
-                }
-              },
-              {
-                type: 'installment',
-                details: {
-                  eligibleAmount: "Purchases over $100",
-                  terms: ["3 months", "6 months", "12 months"],
-                  interestRate: "0% for 12 months",
-                  minPayment: "Equal monthly payments"
-                }
-              }
-            ],
-            rewards: {
-              baseRewards: {
-                value: 12.50,
-                description: "5% back on all purchases"
-              },
-              specialOffer: {
-                value: 12.50,
-                description: "5% bonus on electronics this month"
-              },
-              totalValue: 25.00,
-              effectiveRate: 10.0
-            }
-          },
-          {
-            id: 2,
-            name: "Visa Signature",
-            network: "Visa",
-            last4: "9876",
-            rewardTypes: [
-              {
-                type: 'points',
-                details: {
-                  baseRate: "2X points per $1",
-                  bonusCategories: ["Travel: 3X", "Dining: 3X"],
-                  redemptionOptions: ["Travel Portal", "Gift Cards"],
-                  currentBonus: "25% more points on electronics"
-                }
-              },
-              {
-                type: 'cashback',
-                details: {
-                  baseRate: "1.5% on all purchases",
-                  categories: ["3% on Travel", "3% on Dining"],
-                  redemptionMin: "$25",
-                  currentBonus: "Additional 1.5% on electronics"
-                }
-              },
-              {
-                type: 'installment',
-                details: {
-                  eligibleAmount: "Purchases over $200",
-                  terms: ["3 months", "6 months"],
-                  interestRate: "0% for 6 months",
-                  minPayment: "Equal monthly payments"
-                }
-              }
-            ],
-            rewards: {
-              baseRewards: {
-                value: 7.50,
-                description: "3% back on all purchases"
-              },
-              specialOffer: {
-                value: 5.00,
-                description: "2% bonus on electronics"
-              },
-              totalValue: 12.50,
-              effectiveRate: 5.0
-            }
-          },
-          {
-            id: 3,
-            name: "Visa Platinum",
-            network: "Visa",
-            last4: "5432",
-            rewardTypes: [
-              {
-                type: 'cashback',
-                details: {
-                  baseRate: "1% on all purchases",
-                  categories: ["2% on Travel", "2% on Dining"],
-                  redemptionMin: "$25",
-                  currentBonus: "Additional 1% on electronics"
-                }
-              },
-              {
-                type: 'installment',
-                details: {
-                  eligibleAmount: "Purchases over $500",
-                  terms: ["3 months"],
-                  interestRate: "0% for 3 months",
-                  minPayment: "Equal monthly payments"
-                }
-              }
-            ],
-            rewards: {
-              baseRewards: {
-                value: 5.00,
-                description: "2% back on all purchases"
-              },
-              specialOffer: {
-                value: 2.50,
-                description: "1% bonus on electronics"
-              },
-              totalValue: 7.50,
-              effectiveRate: 3.0
-            }
+  const cards = [
+    {
+      id: 1,
+      type: 'Visa Infinite',
+      last4: '4321',
+      color: 'bg-gradient-to-r from-slate-900 to-slate-800',
+      rewardTypes: [
+        {
+          type: 'points',
+          details: {
+            baseRate: "3X points per $1",
+            bonusCategories: ["Travel: 5X", "Dining: 4X"],
+            redemptionOptions: ["Travel Portal", "Gift Cards", "Cash"],
+            currentBonus: "50% more points on electronics"
           }
-        ]
-      });
-      setLoading(false);
-    }, 1000);
-  }, []);
+        },
+        {
+          type: 'miles',
+          details: {
+            baseRate: "2 miles per $1",
+            partnerAirlines: ["United", "Emirates", "Singapore Airlines"],
+            transferRatio: "1:1 transfer to partners",
+            currentBonus: "2X miles on electronics"
+          }
+        },
+        {
+          type: 'cashback',
+          details: {
+            baseRate: "2% on all purchases",
+            categories: ["5% on Travel", "4% on Dining"],
+            redemptionMin: "$25",
+            currentBonus: "Additional 3% on electronics"
+          }
+        },
+        {
+          type: 'installment',
+          details: {
+            eligibleAmount: "Purchases over $100",
+            terms: ["3 months", "6 months", "12 months"],
+            interestRate: "0% for 12 months",
+            minPayment: "Equal monthly payments"
+          }
+        }
+      ]
+    },
+    {
+      id: 2,
+      type: 'Visa Signature',
+      last4: '9876',
+      color: 'bg-gradient-to-r from-blue-600 to-blue-500',
+      rewardTypes: [
+        {
+          type: 'points',
+          details: {
+            baseRate: "2X points per $1",
+            bonusCategories: ["Travel: 3X", "Dining: 3X"],
+            redemptionOptions: ["Travel Portal", "Gift Cards"],
+            currentBonus: "25% more points on electronics"
+          }
+        },
+        {
+          type: 'cashback',
+          details: {
+            baseRate: "1.5% on all purchases",
+            categories: ["3% on Travel", "3% on Dining"],
+            redemptionMin: "$25",
+            currentBonus: "Additional 1.5% on electronics"
+          }
+        },
+        {
+          type: 'installment',
+          details: {
+            eligibleAmount: "Purchases over $200",
+            terms: ["3 months", "6 months"],
+            interestRate: "0% for 6 months",
+            minPayment: "Equal monthly payments"
+          }
+        }
+      ]
+    },
+    {
+      id: 3,
+      type: 'Visa Platinum',
+      last4: '5432',
+      color: 'bg-gradient-to-r from-slate-600 to-slate-500',
+      rewardTypes: [
+        {
+          type: 'cashback',
+          details: {
+            baseRate: "1% on all purchases",
+            categories: ["2% on Travel", "2% on Dining"],
+            redemptionMin: "$25",
+            currentBonus: "Additional 1% on electronics"
+          }
+        },
+        {
+          type: 'installment',
+          details: {
+            eligibleAmount: "Purchases over $500",
+            terms: ["3 months"],
+            interestRate: "0% for 3 months",
+            minPayment: "Equal monthly payments"
+          }
+        }
+      ]
+    }
+  ];
 
   const RewardTypeIcons = ({ types, cardId }) => (
-    <div className="flex flex-wrap gap-2 mt-2">
+    <div className="flex items-center gap-3">
       {types.map(({ type }) => {
         const IconComponent = REWARD_ICONS[type];
         return (
           <button
             key={type}
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
-              setSelectedRewardType(selectedRewardType?.type === type && selectedRewardType?.cardId === cardId ? null : { type, cardId });
-              setShowCardInfo(null);
+              setShowRewardDetails({ cardId, type, showAll: false });
             }}
-            className={`flex items-center gap-1 px-2 py-1 rounded-full transition-colors ${
-              selectedRewardType?.type === type && selectedRewardType?.cardId === cardId
-              ? 'bg-blue-100 text-blue-600'
-              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
+            className="flex items-center hover:text-blue-500 transition-colors"
           >
-            <IconComponent className="w-3 h-3" />
-            <span className="text-xs capitalize">{type}</span>
+            <IconComponent className="w-4 h-4" />
           </button>
         );
       })}
     </div>
   );
 
-  const RewardTypeDetails = ({ card, type }) => {
-    const rewardType = card.rewardTypes.find(r => r.type === type);
-    if (!rewardType) return null;
-
-    const details = rewardType.details;
-    return (
-      <div className="absolute right-0 top-0 mt-16 w-72 p-4 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            {REWARD_ICONS[type] && React.createElement(REWARD_ICONS[type], { className: "w-4 h-4 text-blue-500" })}
-            <h3 className="font-semibold capitalize">{type} Details</h3>
-          </div>
-          <button 
-            onClick={(e) => {
-              e.stopPropagation();
-              setSelectedRewardType(null);
-            }}
-            className="p-1 hover:bg-gray-100 rounded-full"
-          >
-            <X className="w-4 h-4 text-gray-400" />
-          </button>
-        </div>
-        <div className="space-y-3">
-          {Object.entries(details).map(([key, value]) => (
-            <div key={key}>
-              <p className="text-sm font-medium text-gray-600 capitalize">
-                {key.replace(/([A-Z])/g, ' $1').trim()}
-              </p>
-              {Array.isArray(value) ? (
-                <ul className="mt-1 text-sm text-gray-500">
-                  {value.map((item, i) => (
-                    <li key={i}>{item}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-1 text-sm text-gray-500">{value}</p>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const CardInfo = ({ card }) => (
-    <div className="absolute right-0 top-0 mt-16 w-72 p-4 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+  const AllRewardDetails = ({ rewards }) => (
+    <div className="mt-2 p-4 bg-gray-50 rounded-lg">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold">All Rewards</h3>
+        <h3 className="font-medium">All Rewards</h3>
         <button 
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowCardInfo(null);
-          }}
+          onClick={() => setShowRewardDetails(null)}
           className="p-1 hover:bg-gray-100 rounded-full"
         >
           <X className="w-4 h-4 text-gray-400" />
         </button>
       </div>
-      {card.rewardTypes.map(({ type, details }) => (
-        <div key={type} className="mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            {REWARD_ICONS[type] && React.createElement(REWARD_ICONS[type], { className: "w-4 h-4 text-blue-500" })}
-            <h4 className="font-medium capitalize">{type}</h4>
+      <div className="space-y-4">
+        {rewards.map((reward) => (
+          <div key={reward.type} className="pb-3 border-b last:border-b-0">
+            <div className="flex items-center gap-2 mb-2">
+              {REWARD_ICONS[reward.type] && 
+                React.createElement(REWARD_ICONS[reward.type], { 
+                  className: "w-4 h-4 text-blue-500" 
+                })
+              }
+              <h4 className="font-medium capitalize">{reward.type}</h4>
+            </div>
+            <div className="space-y-2">
+              {Object.entries(reward.details).map(([key, value]) => (
+                <div key={key}>
+                  <p className="text-sm font-medium text-gray-600 capitalize">
+                    {key.replace(/([A-Z])/g, ' $1').trim()}
+                  </p>
+                  {Array.isArray(value) ? (
+                    <ul className="mt-1 text-sm text-gray-500">
+                      {value.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-1 text-sm text-gray-500">{value}</p>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="text-sm text-gray-600">
-            <p>{details.baseRate}</p>
-            {details.currentBonus && (
-              <p className="text-green-600 mt-1">{details.currentBonus}</p>
-            )}
-          </div>
-        </div>
-      ))}
-      <div className="mt-3 pt-3 border-t">
-        <div className="flex justify-between font-semibold">
-          <span>Total Value</span>
-          <span className="text-green-600">
-            ${card.rewards.totalValue.toFixed(2)}
-          </span>
-        </div>
-        <p className="text-xs text-gray-500 mt-1">
-          Effective reward rate: {card.rewards.effectiveRate.toFixed(1)}%
-        </p>
+        ))}
       </div>
     </div>
   );
 
-  if (loading || !cardRewards) {
-    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
-  }
-
-  if (showSuccess) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4">
-        <CheckCircle2 className="w-16 h-16 text-green-500 mb-6" />
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Payment Successful!
-        </h1>
-        <p className="text-gray-600 mb-6">
-          Amount paid: ${amount.toFixed(2)}
-        </p>
-        <div className="bg-gray-50 rounded-lg p-4 w-full mb-8">
-          <p className="text-sm text-gray-500">Transaction ID</p>
-          <p className="text-gray-900 font-medium">{transactionId}</p>
+  const RewardDetails = ({ reward }) => (
+    <div className="mt-2 p-4 bg-gray-50 rounded-lg">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          {REWARD_ICONS[reward.type] && 
+            React.createElement(REWARD_ICONS[reward.type], { 
+              className: "w-4 h-4 text-blue-500" 
+            })
+          }
+          <h3 className="font-medium capitalize">{reward.type} Details</h3>
         </div>
-        <button
-          onClick={() => setShowSuccess(false)}
-          className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold"
+        <button 
+          onClick={() => setShowRewardDetails(null)}
+          className="p-1 hover:bg-gray-100 rounded-full"
         >
-          Done
+          <X className="w-4 h-4 text-gray-400" />
         </button>
       </div>
-    );
-  }
+      <div className="space-y-3">
+        {Object.entries(reward.details).map(([key, value]) => (
+          <div key={key}>
+            <p className="text-sm font-medium text-gray-600 capitalize">
+              {key.replace(/([A-Z])/g, ' $1').trim()}
+            </p>
+            {Array.isArray(value) ? (
+              <ul className="mt-1 text-sm text-gray-500">
+                {value.map((item, i) => (
+                  <li key={i}>{item}</li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-sm text-gray-500">{value}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white px-4 py-4 flex items-center border-b border-gray-200">
-        <button onClick={() => console.log('back clicked')} className="p-2 hover:bg-gray-100 rounded-full">
-          <ArrowLeft className="w-6 h-6 text-gray-600" />
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <div className="px-4 py-4 flex items-center border-b border-gray-200">
+        <button className="p-2">
+          <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>
-        <h1 className="ml-3 text-xl font-semibold text-gray-900">Payment</h1>
+        <h1 className="ml-2 text-lg font-medium">Select Payment Method</h1>
       </div>
 
-      <div className="px-4 py-8 bg-white mt-2">
-        <p className="text-center text-gray-600 text-sm mb-2">Amount to Pay</p>
-        <p className="text-center text-4xl font-bold text-gray-900">
-          ${amount.toFixed(2)}
-        </p>
+      {/* Order Summary Toggle */}
+      <div className="px-4 py-3 border-b border-gray-200">
+        <button 
+          onClick={() => setShowOrderSummary(!showOrderSummary)}
+          className="w-full flex items-center justify-between text-gray-600"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm">Show order summary</span>
+            <ChevronDown className="w-4 h-4" />
+          </div>
+          <span className="font-medium">$459.00</span>
+        </button>
       </div>
 
-      <div className="px-4 py-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">
-          Select Payment Method
-        </h2>
-        <div className="space-y-3 mb-6">
-          {cardRewards.cards.map(card => (
-            <button
-              key={card.id}
-              onClick={() => setSelectedMethod(card.id)}
-              className={`w-full p-4 rounded-xl border relative ${
-                selectedMethod === card.id
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-200 bg-white'
-              }`}
-            >
-              <div className="flex items-center">
-                <div className={`w-5 h-5 rounded-full border-2 mr-4 ${
-                  selectedMethod === card.id
-                    ? 'border-blue-500 bg-blue-500'
-                    : 'border-gray-300'
-                }`}>
-                  {selectedMethod === card.id && (
-                    <div className="w-full h-full rounded-full bg-white scale-50" />
-                  )}
-                </div>
-                
-                <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <CreditCard className={`w-6 h-6 ${
-                    selectedMethod === card.id ? 'text-blue-500' : 'text-gray-600'
-                  }`} />
-                </div>
-                
-                <div className="flex-1 ml-3 text-left">
-                  <p className="font-medium text-gray-900">{card.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {card.network} •••• {card.last4}
-                    <span className="ml-2 text-green-600">
-                      (${card.rewards.totalValue.toFixed(2)} value)
-                    </span>
-                  </p>
-                  <RewardTypeIcons types={card.rewardTypes} cardId={card.id} />
+      {/* Card Icons */}
+      <div className="px-4 py-3 border-b border-gray-200">
+        <div className="flex gap-2">
+          <img src="/api/placeholder/32/20" alt="Visa" className="h-5 object-contain" />
+          <img src="/api/placeholder/32/20" alt="Mastercard" className="h-5 object-contain" />
+          <img src="/api/placeholder/32/20" alt="Amex" className="h-5 object-contain" />
+        </div>
+      </div>
+
+      {/* Cards List */}
+      <div className="px-4 py-2">
+        {cards.map((card) => (
+          <div key={card.id} className="mb-3">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="payment-method"
+                checked={selectedCard === card.id}
+                onChange={() => setSelectedCard(card.id)}
+                className="sr-only"
+              />
+              <div className={`
+                flex-1 flex items-center p-3 border rounded-lg cursor-pointer
+                ${selectedCard === card.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}
+              `}>
+                <div className="flex items-center flex-1">
+                  <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center
+                    ${selectedCard === card.id ? 'border-blue-500' : 'border-gray-300'}
+                  `}>
+                    {selectedCard === card.id && (
+                      <div className="w-2 h-2 rounded-full bg-blue-500" />
+                    )}
+                  </div>
+                  
+                  <div className={`w-10 h-7 ${card.color} rounded`} />
+                  
+                  <div className="ml-3 flex-1">
+                    <div className="flex justify-between items-center">
+                      <p className="text-sm text-gray-900">{card.type}</p>
+                      <RewardTypeIcons types={card.rewardTypes} cardId={card.id} />
+                    </div>
+                    <p className="text-sm text-gray-500">VISA •••• {card.last4}</p>
+                  </div>
                 </div>
 
-                <button 
+                <button
                   onClick={(e) => {
-                    e.stopPropagation();
-                    setShowCardInfo(showCardInfo === card.id ? null : card.id);
-                    setSelectedRewardType(null);
+                    e.preventDefault();
+                    if (!showRewardDetails || showRewardDetails.cardId !== card.id || !showRewardDetails.showAll) {
+                      setShowRewardDetails({ cardId: card.id, showAll: true });
+                    } else {
+                      setShowRewardDetails(null);
+                    }
                   }}
-                  className="p-2 hover:bg-gray-100 rounded-full"
+                  className="p-2 hover:bg-gray-100 rounded-full ml-2"
                 >
-                  <Info className="w-5 h-5 text-gray-400" />
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
+            </label>
 
-              {showCardInfo === card.id && <CardInfo card={card} />}
-              {selectedRewardType?.cardId === card.id && (
-                <RewardTypeDetails 
-                  card={card} 
-                  type={selectedRewardType.type}
+            {showRewardDetails?.cardId === card.id && (
+              showRewardDetails.showAll ? (
+                <AllRewardDetails rewards={card.rewardTypes} />
+              ) : (
+                <RewardDetails 
+                  reward={card.rewardTypes.find(r => r.type === showRewardDetails.type)}
                 />
-              )}
-            </button>
-          ))}
-        </div>
-        
-        <button 
-          onClick={() => setShowSuccess(true)}
-          className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
-        >
-          Pay ${amount.toFixed(2)}
+              )
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Place Order Button */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t">
+        <button className="w-full bg-gray-900 text-white py-3 rounded font-medium">
+          Place Order
         </button>
       </div>
     </div>
