@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   ArrowLeft, 
   ChevronDown, 
@@ -7,130 +7,125 @@ import {
   Plane,
   Coins,
   Clock,
-  X
+  X,
+  CheckCircle2
 } from 'lucide-react';
 
-const REWARD_ICONS = {
+// Type definitions
+interface PaymentViewProps {
+  amount: number;
+  merchant: string;
+  category: string;
+  onBack: () => void;
+}
+
+interface RewardType {
+  type: 'points' | 'miles' | 'cashback' | 'installment';
+  details: {
+    baseRate: string;
+    bonusCategories?: string[];
+    redemptionOptions?: string[];
+    partnerAirlines?: string[];
+    transferRatio?: string;
+    currentBonus?: string;
+    eligibleAmount?: string;
+    terms?: string[];
+    interestRate?: string;
+    minPayment?: string;
+    [key: string]: any;
+  };
+}
+
+interface CardRewards {
+  baseRewards: {
+    value: number;
+    description: string;
+  };
+  specialOffer: {
+    value: number;
+    description: string;
+  };
+  totalValue: number;
+  effectiveRate: number;
+  rewardTypes: RewardType[];
+}
+
+interface Card {
+  id: number;
+  name: string;
+  network: string;
+  last4: string;
+  color: string;
+  rewards: CardRewards;
+}
+
+interface AnalysisResponse {
+  cards: Card[];
+  transaction: {
+    amount: number;
+    merchant: string;
+    category: string;
+  };
+  status: string;
+}
+
+interface RewardDetailsState {
+  cardId: number;
+  type?: 'points' | 'miles' | 'cashback' | 'installment';
+  showAll?: boolean;
+}
+
+const REWARD_ICONS: Record<string, React.ElementType> = {
   points: Gift,
   miles: Plane,
   cashback: Coins,
   installment: Clock
 };
 
-const PaymentView = () => {
-  const [selectedCard, setSelectedCard] = useState(null);
-  const [showOrderSummary, setShowOrderSummary] = useState(false);
-  const [showRewardDetails, setShowRewardDetails] = useState(null);
+// Component
+const PaymentView: React.FC<PaymentViewProps> = ({ 
+  amount,
+  merchant,
+  category,
+  onBack 
+}) => {
+  const [selectedMethod, setSelectedMethod] = useState<number>(1);
+  const [showSuccess, setShowSuccess] = useState<boolean>(false);
+  const [showOrderSummary, setShowOrderSummary] = useState<boolean>(false);
+  const [showRewardDetails, setShowRewardDetails] = useState<RewardDetailsState | null>(null);
+  const [cardRewards, setCardRewards] = useState<AnalysisResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
 
-  const cards = [
-    {
-      id: 1,
-      type: 'Visa Infinite',
-      last4: '4321',
-      color: 'bg-gradient-to-r from-slate-900 to-slate-800',
-      rewardTypes: [
-        {
-          type: 'points',
-          details: {
-            baseRate: "3X points per $1",
-            bonusCategories: ["Travel: 5X", "Dining: 4X"],
-            redemptionOptions: ["Travel Portal", "Gift Cards", "Cash"],
-            currentBonus: "50% more points on electronics"
-          }
-        },
-        {
-          type: 'miles',
-          details: {
-            baseRate: "2 miles per $1",
-            partnerAirlines: ["United", "Emirates", "Singapore Airlines"],
-            transferRatio: "1:1 transfer to partners",
-            currentBonus: "2X miles on electronics"
-          }
-        },
-        {
-          type: 'cashback',
-          details: {
-            baseRate: "2% on all purchases",
-            categories: ["5% on Travel", "4% on Dining"],
-            redemptionMin: "$25",
-            currentBonus: "Additional 3% on electronics"
-          }
-        },
-        {
-          type: 'installment',
-          details: {
-            eligibleAmount: "Purchases over $100",
-            terms: ["3 months", "6 months", "12 months"],
-            interestRate: "0% for 12 months",
-            minPayment: "Equal monthly payments"
-          }
-        }
-      ]
-    },
-    {
-      id: 2,
-      type: 'Visa Signature',
-      last4: '9876',
-      color: 'bg-gradient-to-r from-blue-600 to-blue-500',
-      rewardTypes: [
-        {
-          type: 'points',
-          details: {
-            baseRate: "2X points per $1",
-            bonusCategories: ["Travel: 3X", "Dining: 3X"],
-            redemptionOptions: ["Travel Portal", "Gift Cards"],
-            currentBonus: "25% more points on electronics"
-          }
-        },
-        {
-          type: 'cashback',
-          details: {
-            baseRate: "1.5% on all purchases",
-            categories: ["3% on Travel", "3% on Dining"],
-            redemptionMin: "$25",
-            currentBonus: "Additional 1.5% on electronics"
-          }
-        },
-        {
-          type: 'installment',
-          details: {
-            eligibleAmount: "Purchases over $200",
-            terms: ["3 months", "6 months"],
-            interestRate: "0% for 6 months",
-            minPayment: "Equal monthly payments"
-          }
-        }
-      ]
-    },
-    {
-      id: 3,
-      type: 'Visa Platinum',
-      last4: '5432',
-      color: 'bg-gradient-to-r from-slate-600 to-slate-500',
-      rewardTypes: [
-        {
-          type: 'cashback',
-          details: {
-            baseRate: "1% on all purchases",
-            categories: ["2% on Travel", "2% on Dining"],
-            redemptionMin: "$25",
-            currentBonus: "Additional 1% on electronics"
-          }
-        },
-        {
-          type: 'installment',
-          details: {
-            eligibleAmount: "Purchases over $500",
-            terms: ["3 months"],
-            interestRate: "0% for 3 months",
-            minPayment: "Equal monthly payments"
-          }
-        }
-      ]
-    }
-  ];
+  const transactionId = useMemo(() => 'TXN' + Math.random().toString(36).substr(2, 9).toUpperCase(), []);
 
-  const RewardTypeIcons = ({ types, cardId }) => (
+  useEffect(() => {
+    const analyzeTransaction = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/api/analyze-purchase', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amount,
+            user_id: 'user123',
+            merchant,
+            category
+          })
+        });
+
+        const data: AnalysisResponse = await response.json();
+        setCardRewards(data);
+      } catch (error) {
+        console.error('Failed to analyze transaction:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    analyzeTransaction();
+  }, [amount, merchant, category]);
+
+  // Reward Type Icons Component
+  const RewardTypeIcons: React.FC<{ types: RewardType[]; cardId: number }> = ({ types, cardId }) => (
     <div className="flex items-center gap-3">
       {types.map(({ type }) => {
         const IconComponent = REWARD_ICONS[type];
@@ -151,53 +146,8 @@ const PaymentView = () => {
     </div>
   );
 
-  const AllRewardDetails = ({ rewards }) => (
-    <div className="mt-2 p-4 bg-gray-50 rounded-lg">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-medium">All Rewards</h3>
-        <button 
-          onClick={() => setShowRewardDetails(null)}
-          className="p-1 hover:bg-gray-100 rounded-full"
-        >
-          <X className="w-4 h-4 text-gray-400" />
-        </button>
-      </div>
-      <div className="space-y-4">
-        {rewards.map((reward) => (
-          <div key={reward.type} className="pb-3 border-b last:border-b-0">
-            <div className="flex items-center gap-2 mb-2">
-              {REWARD_ICONS[reward.type] && 
-                React.createElement(REWARD_ICONS[reward.type], { 
-                  className: "w-4 h-4 text-blue-500" 
-                })
-              }
-              <h4 className="font-medium capitalize">{reward.type}</h4>
-            </div>
-            <div className="space-y-2">
-              {Object.entries(reward.details).map(([key, value]) => (
-                <div key={key}>
-                  <p className="text-sm font-medium text-gray-600 capitalize">
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                  </p>
-                  {Array.isArray(value) ? (
-                    <ul className="mt-1 text-sm text-gray-500">
-                      {value.map((item, i) => (
-                        <li key={i}>{item}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="mt-1 text-sm text-gray-500">{value}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  const RewardDetails = ({ reward }) => (
+  // Single Reward Details Component
+  const RewardDetails: React.FC<{ reward: RewardType }> = ({ reward }) => (
     <div className="mt-2 p-4 bg-gray-50 rounded-lg">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -236,11 +186,100 @@ const PaymentView = () => {
     </div>
   );
 
+  // All Rewards Details Component
+  const AllRewardDetails: React.FC<{ card: Card }> = ({ card }) => (
+    <div className="mt-2 p-4 bg-gray-50 rounded-lg">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-medium">Rewards Breakdown</h3>
+        <button 
+          onClick={() => setShowRewardDetails(null)}
+          className="p-1 hover:bg-gray-100 rounded-full"
+        >
+          <X className="w-4 h-4 text-gray-400" />
+        </button>
+      </div>
+      <div className="space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-600">Base Rewards</span>
+          <span className="font-medium">${card.rewards.baseRewards.value.toFixed(2)}</span>
+        </div>
+        <p className="text-xs text-gray-500">{card.rewards.baseRewards.description}</p>
+
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-600">Special Offer</span>
+          <span className="font-medium">${card.rewards.specialOffer.value.toFixed(2)}</span>
+        </div>
+        <p className="text-xs text-gray-500">{card.rewards.specialOffer.description}</p>
+
+        <div className="mt-3 pt-2 border-t">
+          <div className="flex justify-between font-semibold">
+            <span>Total Value</span>
+            <span className="text-green-600">
+              ${card.rewards.totalValue.toFixed(2)}
+            </span>
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            Effective reward rate: {card.rewards.effectiveRate.toFixed(1)}%
+          </p>
+        </div>
+
+        <div className="mt-4 space-y-4">
+          {card.rewards.rewardTypes.map((rewardType) => (
+            <div key={rewardType.type} className="pb-3 border-b last:border-b-0">
+              <div className="flex items-center gap-2 mb-2">
+                {REWARD_ICONS[rewardType.type] && 
+                  React.createElement(REWARD_ICONS[rewardType.type], { 
+                    className: "w-4 h-4 text-blue-500" 
+                  })
+                }
+                <h4 className="font-medium capitalize">{rewardType.type}</h4>
+              </div>
+              <p className="text-sm text-gray-600">{rewardType.details.baseRate}</p>
+              {rewardType.details.currentBonus && (
+                <p className="text-sm text-green-600 mt-1">
+                  {rewardType.details.currentBonus}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (loading || !cardRewards) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
+  if (showSuccess) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4">
+        <CheckCircle2 className="w-16 h-16 text-green-500 mb-6" />
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          Payment Successful!
+        </h1>
+        <p className="text-gray-600 mb-6">
+          Amount paid: ${amount.toFixed(2)}
+        </p>
+        <div className="bg-gray-50 rounded-lg p-4 w-full mb-8">
+          <p className="text-sm text-gray-500">Transaction ID</p>
+          <p className="text-gray-900 font-medium">{transactionId}</p>
+        </div>
+        <button
+          onClick={onBack}
+          className="w-full bg-blue-600 text-white py-4 rounded-xl font-semibold"
+        >
+          Done
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
       <div className="px-4 py-4 flex items-center border-b border-gray-200">
-        <button className="p-2">
+        <button onClick={onBack} className="p-2">
           <ArrowLeft className="w-5 h-5 text-gray-600" />
         </button>
         <h1 className="ml-2 text-lg font-medium">Select Payment Method</h1>
@@ -256,40 +295,31 @@ const PaymentView = () => {
             <span className="text-sm">Show order summary</span>
             <ChevronDown className="w-4 h-4" />
           </div>
-          <span className="font-medium">$459.00</span>
+          <span className="font-medium">${amount.toFixed(2)}</span>
         </button>
-      </div>
-
-      {/* Card Icons */}
-      <div className="px-4 py-3 border-b border-gray-200">
-        <div className="flex gap-2">
-          <img src="/api/placeholder/32/20" alt="Visa" className="h-5 object-contain" />
-          <img src="/api/placeholder/32/20" alt="Mastercard" className="h-5 object-contain" />
-          <img src="/api/placeholder/32/20" alt="Amex" className="h-5 object-contain" />
-        </div>
       </div>
 
       {/* Cards List */}
       <div className="px-4 py-2">
-        {cards.map((card) => (
+        {cardRewards.cards.map((card) => (
           <div key={card.id} className="mb-3">
             <label className="flex items-center">
               <input
                 type="radio"
                 name="payment-method"
-                checked={selectedCard === card.id}
-                onChange={() => setSelectedCard(card.id)}
+                checked={selectedMethod === card.id}
+                onChange={() => setSelectedMethod(card.id)}
                 className="sr-only"
               />
               <div className={`
                 flex-1 flex items-center p-3 border rounded-lg cursor-pointer
-                ${selectedCard === card.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}
+                ${selectedMethod === card.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}
               `}>
                 <div className="flex items-center flex-1">
                   <div className={`w-4 h-4 rounded-full border-2 mr-3 flex items-center justify-center
-                    ${selectedCard === card.id ? 'border-blue-500' : 'border-gray-300'}
+                    ${selectedMethod === card.id ? 'border-blue-500' : 'border-gray-300'}
                   `}>
-                    {selectedCard === card.id && (
+                    {selectedMethod === card.id && (
                       <div className="w-2 h-2 rounded-full bg-blue-500" />
                     )}
                   </div>
@@ -298,17 +328,22 @@ const PaymentView = () => {
                   
                   <div className="ml-3 flex-1">
                     <div className="flex justify-between items-center">
-                      <p className="text-sm text-gray-900">{card.type}</p>
-                      <RewardTypeIcons types={card.rewardTypes} cardId={card.id} />
+                      <p className="text-sm text-gray-900">{card.name}</p>
+                      <RewardTypeIcons types={card.rewards.rewardTypes} cardId={card.id} />
                     </div>
-                    <p className="text-sm text-gray-500">VISA •••• {card.last4}</p>
+                    <p className="text-sm text-gray-500">
+                      {card.network} •••• {card.last4}
+                      <span className="ml-2 text-green-600">
+                        (${card.rewards.totalValue.toFixed(2)} value)
+                      </span>
+                    </p>
                   </div>
                 </div>
 
                 <button
                   onClick={(e) => {
                     e.preventDefault();
-                    if (!showRewardDetails || showRewardDetails.cardId !== card.id || !showRewardDetails.showAll) {
+                    if (!showRewardDetails?.showAll || showRewardDetails.cardId !== card.id) {
                       setShowRewardDetails({ cardId: card.id, showAll: true });
                     } else {
                       setShowRewardDetails(null);
@@ -323,10 +358,10 @@ const PaymentView = () => {
 
             {showRewardDetails?.cardId === card.id && (
               showRewardDetails.showAll ? (
-                <AllRewardDetails rewards={card.rewardTypes} />
-              ) : (
+                <AllRewardDetails card={card} />
+              ) : showRewardDetails.type && (
                 <RewardDetails 
-                  reward={card.rewardTypes.find(r => r.type === showRewardDetails.type)}
+                  reward={card.rewards.rewardTypes.find(r => r.type === showRewardDetails.type)!}
                 />
               )
             )}
@@ -336,8 +371,11 @@ const PaymentView = () => {
 
       {/* Place Order Button */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t">
-        <button className="w-full bg-gray-900 text-white py-3 rounded font-medium">
-          Place Order
+        <button 
+          onClick={() => setShowSuccess(true)}
+          className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors"
+        >
+          Pay ${amount.toFixed(2)}
         </button>
       </div>
     </div>
