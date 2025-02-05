@@ -1,0 +1,328 @@
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, ChevronRight, Gift, Plane, Coins, Calendar, X } from 'lucide-react';
+
+interface PaymentViewProps {
+  amount: number;
+  merchant?: string;
+  category?: string;
+  onBack: () => void;
+}
+
+interface CardBenefit {
+  details: string;
+  rate: string;
+  additionalInfo: string[];
+}
+
+interface CardBenefits {
+  rewards?: CardBenefit;
+  miles?: CardBenefit;
+  cashback?: CardBenefit;
+  installment?: CardBenefit;
+}
+
+interface Card {
+  id: number;
+  type: string;
+  network: string;
+  tier: string;
+  last4: string;
+  color: string;
+  expiry?: string;
+  benefits: CardBenefits;
+  calculated_values?: {
+    base_reward: number;
+    bonus_reward: number;
+    total_value: number;
+    effective_rate: number;
+  };
+}
+
+interface ApiResponse {
+  cards: Card[];
+  transaction: {
+    amount: number;
+    merchant: string;
+    category: string;
+  };
+  status: string;
+}
+interface BestValue {
+  type: string;
+  value: number;
+  description: string;
+}
+
+interface Card {
+  id: number;
+  type: string;
+  network: string;
+  tier: string;
+  last4: string;
+  color: string;
+  expiry?: string;
+  benefits: CardBenefits;
+  best_value?: BestValue;
+  total_value: number;
+  effective_rate: number;
+}
+type BenefitType = 'rewards' | 'miles' | 'cashback' | 'installment';
+
+interface SelectedBenefit {
+  cardId: number;
+  type: BenefitType;
+}
+
+const benefitTypes = {
+  rewards: {
+    icon: <Gift className="w-4 h-4" />,
+    title: 'Reward Points',
+    description: 'Earn points on every purchase'
+  },
+  miles: {
+    icon: <Plane className="w-4 h-4" />,
+    title: 'Travel Miles',
+    description: 'Earn miles for travel'
+  },
+  cashback: {
+    icon: <Coins className="w-4 h-4" />,
+    title: 'Cashback',
+    description: 'Earn cash back on purchases'
+  },
+  installment: {
+    icon: <Calendar className="w-4 h-4" />,
+    title: 'Installment',
+    description: 'Split into monthly payments'
+  }
+};
+
+const BenefitDetails: React.FC<{
+  benefit: BenefitType;
+  details: CardBenefit;
+  onClose: () => void;
+ }> = ({ benefit, details, onClose }) => (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+    <div className="bg-white rounded-lg w-full max-w-sm">
+      <div className="flex items-center justify-between border-b p-2">
+        <div className="flex items-center gap-1.5">
+          {benefitTypes[benefit].icon}
+          <h3 className="font-medium text-sm">{benefitTypes[benefit].title}</h3>
+        </div>
+        <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+ 
+      <div className="p-2 space-y-2">
+ <div className="flex items-center justify-between">
+   <p className="text-green-600 font-medium text-base">{details.details}</p>
+   <p className="text-xs text-gray-500">{details.rate}</p>
+ </div>
+
+ <p className="text-xs text-gray-600">
+   {details.additionalInfo.join(", ")}
+ </p>
+</div>
+    </div>
+  </div>
+ );
+
+const PaymentView1: React.FC<PaymentViewProps> = React.memo(({ 
+  amount, 
+  merchant = "Apple Store", 
+  category = "Electronics", 
+  onBack 
+}) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [cardData, setCardData] = useState<ApiResponse | null>(null);
+  const [selectedMethod, setSelectedMethod] = useState<number | null>(null);
+  const [expandedCard, setExpandedCard] = useState<number | null>(null);
+  const [selectedBenefit, setSelectedBenefit] = useState<SelectedBenefit | null>(null);
+
+  useEffect(() => {
+    let isSubscribed = true;
+
+    const analyzePurchase = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('http://localhost:8000/api/analyze-purchase', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            amount,
+            user_id: "test-user",
+            merchant,
+            category
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to analyze purchase');
+        }
+
+        const data: ApiResponse = await response.json();
+        if (isSubscribed) {
+          setCardData(data);
+          setLoading(false);
+        }
+      } catch (err) {
+        if (isSubscribed) {
+          setError(err instanceof Error ? err.message : 'An error occurred');
+          setLoading(false);
+        }
+      }
+    };
+
+    analyzePurchase();
+    
+    return () => {
+      isSubscribed = false;
+    };
+  }, [amount, merchant, category]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-gray-600">Analyzing best payment options...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-red-600">Error: {error}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      <div className="border-b border-gray-100">
+        <div className="h-12 px-4 flex items-center gap-3">
+          <button onClick={onBack} className="hover:bg-gray-50 rounded-full p-1">
+            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          </button>
+          <h1 className="text-lg">Select Payment Method</h1>
+        </div>
+
+        <div className="h-11 px-4 flex items-center justify-between border-t border-gray-100">
+          <div className="text-sm text-gray-600">
+            {merchant} - {category}
+          </div>
+          <span className="text-base font-medium">${amount.toFixed(2)}</span>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-3">
+        {cardData?.cards.map(card => (
+          <div key={card.id} className="border rounded-lg">
+            <button
+              onClick={() => setSelectedMethod(card.id)}
+              className="w-full flex items-center p-3"
+            >
+              <input
+                type="radio"
+                checked={selectedMethod === card.id}
+                onChange={() => setSelectedMethod(card.id)}
+                className="w-4 h-4 border-gray-300"
+              />
+
+              <div className={`w-12 h-8 ${card.color} rounded ml-3 flex items-center justify-center`}>
+                <span className="text-white text-xs font-medium">{card.network}</span>
+              </div>
+
+              <div className="ml-3 flex-1">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-900">{card.type}</p>
+                    <p className="text-xs text-gray-500">{card.network} •••• {card.last4}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {Object.entries(card.benefits).map(([type]) => (
+                      <button
+                        key={type}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedBenefit({ 
+                            cardId: card.id, 
+                            type: type as BenefitType 
+                          });
+                        }}
+                        className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200"
+                      >
+                        {benefitTypes[type as BenefitType].icon}
+                      </button>
+                    ))}
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedCard(expandedCard === card.id ? null : card.id);
+                      }}
+                      className="p-2 text-gray-400"
+                    >
+                      <ChevronRight className={`w-5 h-5 transition-transform ${
+                        expandedCard === card.id ? 'rotate-90' : ''
+                      }`} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </button>
+
+                          {expandedCard === card.id && (
+              <div className="px-3 pb-3 space-y-2">
+                {Object.entries(card.benefits).map(([type, benefit]) => (
+                  <div key={type} className="p-2 bg-gray-50 rounded">
+                    <div className="flex items-center gap-2">
+                      {benefitTypes[type as BenefitType].icon}
+                      <p className="text-sm font-medium">{benefitTypes[type as BenefitType].title}</p>
+                    </div>
+                    <p className="text-sm mt-1">{benefit.details}</p>
+                    <p className="text-xs text-gray-600">{benefit.rate}</p>
+                    <p className="text-xs text-gray-600">
+   {benefit.additionalInfo.join(", ")}
+ </p>
+                  </div>
+                ))}
+                {card.best_value && (
+                  <div className="p-2 bg-green-50 rounded">
+                    <p className="text-sm font-medium text-green-700">Best Value: ${card.best_value.value.toFixed(2)}</p>
+                    <p className="text-xs text-green-600">{card.best_value.description}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {selectedBenefit && cardData?.cards.find(c => c.id === selectedBenefit.cardId)?.benefits[selectedBenefit.type] && (
+        <BenefitDetails
+          benefit={selectedBenefit.type}
+          details={cardData.cards.find(c => c.id === selectedBenefit.cardId)!.benefits[selectedBenefit.type]!}
+          onClose={() => setSelectedBenefit(null)}
+        />
+      )}
+
+      <div className="sticky bottom-0 w-full bg-white border-t">
+        <div className="px-4 py-4">
+          <button 
+            className="w-full bg-black text-white py-3 rounded-lg font-medium disabled:bg-gray-300"
+            disabled={!selectedMethod}
+            onClick={() => {
+              console.log('Processing payment with card:', selectedMethod);
+            }}
+          >
+            {selectedMethod ? 'Place Order' : 'Select a Payment Method'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+export default PaymentView1;
