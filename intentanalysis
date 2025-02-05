@@ -1,241 +1,157 @@
 import React, { useState } from 'react';
-import { 
-  ChevronDown, 
-  ChevronUp, 
-  Database, 
-  GitBranch, 
-  Terminal, 
-  AlertCircle,
-  GitFork
-} from 'lucide-react';
+import { Search, Loader2 } from 'lucide-react';
+import QueryAnalysisDisplay from './query-analysis-display';
 
-// Sample data from backend response
-const sampleData = {
+// Updated interface to match exact response structure
+interface QueryResponse {
   query_understanding: {
-    identified_entities: ["TVS_PCR_INFO"],
-    relationships: [],
-    conditions: [],
-    aggregations: []
-  },
-  transformation_steps: [
-    {
-      step: "1",
-      action: "Select all columns from TVS_PCR_INFO table",
-      explanation: "Since the query asks for 'pcr info' without specifying any particular columns, we'll select all PCR information.",
-      sql_component: "SELECT *"
-    },
-    {
-      step: "2",
-      action: "Specify the source table",
-      explanation: "We identify the TVS_PCR_INFO table as the source for our query based on its relevance",
-      sql_component: "FROM TVS_PCR_INFO"
-    }
-  ],
-  generated_sql: "SELECT * FROM TVS_PCR_INFO",
-  natural_explanation: "This SQL query retrieves all information about PCRs (Point of Compromise Records) such as PCR number, location information (city, state, country), phone number, and other relevant fields stored in the TVS_PCR_INFO table.",
-  alternative_approaches: [
-    {
-      sql: "SELECT PCR, PCR_NM, CITY_NM, ST_NM, CTRY_NM, PHN_NUM FROM TVS_PCR_INFO",
-      explanation: "This alternative query selects only specific columns that might be most relevant",
-      trade_offs: "This approach reduces the amount of data returned, which could improve query performance."
-    }
-  ],
-  complexity_analysis: {
-    level: "simple",
-    factors: [
-      "No joins required",
-      "No filtering conditions",
-      "No aggregations"
-    ],
-    optimization_opportunities: [
-      "If the table is large, consider adding pagination",
-      "If specific columns are frequently accessed, consider creating an index on those columns",
-      "If only certain columns are typically needed, consider selecting only those columns instead of using SELECT *"
-    ]
-  }
-};
-
-const SectionHeader = ({ title, isExpanded, onToggle, icon: Icon }) => (
-  <div 
-    onClick={onToggle}
-    className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
-  >
-    <div className="flex items-center gap-2">
-      <Icon className="w-5 h-5 text-blue-600" />
-      <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
-    </div>
-    {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-  </div>
-);
-
-const QueryAnalysisDisplay = () => {
-  const [expandedSections, setExpandedSections] = useState({
-    understanding: true,
-    steps: true,
-    sql: true,
-    alternatives: false,
-    complexity: false
-  });
-
-  const toggleSection = (section) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
+    identified_entities: string[];
+    relationships: string[];
+    conditions: string[];
+    aggregations: string[];
   };
+  transformation_steps: Array<{
+    step: string;
+    action: string;
+    explanation: string;
+    sql_component: string;
+  }>;
+  generated_sql: string;
+  natural_explanation: string;
+  alternative_approaches: Array<{
+    sql: string;
+    explanation: string;
+    trade_offs: string;
+  }>;
+  complexity_analysis: {
+    level: 'simple' | 'moderate' | 'complex';
+    factors: string[];
+    optimization_opportunities: string[];
+  };
+}
 
-  const getComplexityColor = (level) => {
-    switch(level) {
-      case 'simple': return 'text-green-600';
-      case 'moderate': return 'text-yellow-600';
-      case 'complex': return 'text-red-600';
-      default: return 'text-gray-600';
+const QueryIntentAnalysis = () => {
+  const [query, setQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<QueryResponse | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (!accessToken) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await fetch('http://127.0.0.1:8001/api/v1/query-analysis/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({
+          query: query.trim()
+        })
+      });
+
+      if (response.status === 401) {
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to analyze query');
+      }
+
+      const data: QueryResponse = await response.json();
+      
+      // Validate the response structure
+      if (!data.query_understanding || !data.transformation_steps || !data.generated_sql) {
+        throw new Error('Invalid response format from server');
+      }
+
+      setAnalysisResult(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      if (err instanceof Error && err.message.includes('login')) {
+        // Handle session expiry - redirect to login or show login modal
+        console.log('Session expired, handle redirect');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="space-y-4 bg-white rounded-lg shadow">
-      {/* Query Understanding Section */}
-      <div className="border-b">
-        <SectionHeader 
-          title="Query Understanding"
-          isExpanded={expandedSections.understanding}
-          onToggle={() => toggleSection('understanding')}
-          icon={Database}
-        />
-        {expandedSections.understanding && (
-          <div className="p-4">
-            <div className="grid md:grid-cols-2 gap-6">
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="space-y-8">
+          {/* Input Section */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <h3 className="font-medium text-gray-900 mb-2">Identified Entities</h3>
-                <ul className="list-disc pl-5 space-y-1">
-                  {sampleData.query_understanding.identified_entities.map((entity, idx) => (
-                    <li key={idx} className="text-gray-600">{entity}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <h3 className="font-medium text-gray-900 mb-2">Relationships</h3>
-                <p className="text-gray-600">No relationships identified</p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Transformation Steps */}
-      <div className="border-b">
-        <SectionHeader 
-          title="Transformation Steps"
-          isExpanded={expandedSections.steps}
-          onToggle={() => toggleSection('steps')}
-          icon={GitBranch}
-        />
-        {expandedSections.steps && (
-          <div className="p-4">
-            <div className="space-y-6">
-              {sampleData.transformation_steps.map((step, idx) => (
-                <div key={idx} className="border-l-2 border-blue-500 pl-4">
-                  <h3 className="font-medium text-gray-900">
-                    Step {step.step}: {step.action}
-                  </h3>
-                  <p className="text-gray-600 mt-1">{step.explanation}</p>
-                  <code className="block bg-gray-50 p-3 mt-2 rounded text-sm overflow-x-auto">
-                    {step.sql_component}
-                  </code>
+                <label
+                  htmlFor="query"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
+                  Natural Language Query
+                </label>
+                <div className="relative rounded-md shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <textarea
+                    id="query"
+                    rows={3}
+                    className="block w-full pl-10 pr-12 py-2 sm:text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Enter your query in natural language (e.g., 'Show me all PCR information from TVS_PCR_INFO table')"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Generated SQL */}
-      <div className="border-b">
-        <SectionHeader 
-          title="Generated SQL"
-          isExpanded={expandedSections.sql}
-          onToggle={() => toggleSection('sql')}
-          icon={Terminal}
-        />
-        {expandedSections.sql && (
-          <div className="p-4 space-y-4">
-            <code className="block bg-gray-50 p-4 rounded text-sm overflow-x-auto whitespace-pre-wrap">
-              {sampleData.generated_sql}
-            </code>
-            <div className="bg-blue-50 p-4 rounded">
-              <p className="text-gray-700">{sampleData.natural_explanation}</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Alternative Approaches */}
-      <div className="border-b">
-        <SectionHeader 
-          title="Alternative Approaches"
-          isExpanded={expandedSections.alternatives}
-          onToggle={() => toggleSection('alternatives')}
-          icon={GitFork}
-        />
-        {expandedSections.alternatives && (
-          <div className="p-4">
-            <div className="space-y-6">
-              {sampleData.alternative_approaches.map((approach, idx) => (
-                <div key={idx} className="border-l-2 border-gray-300 pl-4">
-                  <code className="block bg-gray-50 p-3 rounded text-sm overflow-x-auto">
-                    {approach.sql}
-                  </code>
-                  <p className="mt-2 text-gray-700">{approach.explanation}</p>
-                  <p className="mt-1 text-gray-500 text-sm">{approach.trade_offs}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Complexity Analysis */}
-      <div>
-        <SectionHeader 
-          title="Complexity Analysis"
-          isExpanded={expandedSections.complexity}
-          onToggle={() => toggleSection('complexity')}
-          icon={AlertCircle}
-        />
-        {expandedSections.complexity && (
-          <div className="p-4">
-            <div className="space-y-4">
-              <div className="flex items-center">
-                <span className="font-medium mr-2">Complexity Level:</span>
-                <span className={`${getComplexityColor(sampleData.complexity_analysis.level)} font-medium`}>
-                  {sampleData.complexity_analysis.level.toUpperCase()}
-                </span>
-              </div>
-              
-              <div>
-                <h3 className="font-medium text-gray-900 mb-2">Contributing Factors</h3>
-                <ul className="list-disc pl-5 space-y-1">
-                  {sampleData.complexity_analysis.factors.map((factor, idx) => (
-                    <li key={idx} className="text-gray-600">{factor}</li>
-                  ))}
-                </ul>
               </div>
 
-              <div>
-                <h3 className="font-medium text-gray-900 mb-2">Optimization Opportunities</h3>
-                <ul className="list-disc pl-5 space-y-1">
-                  {sampleData.complexity_analysis.optimization_opportunities.map((opt, idx) => (
-                    <li key={idx} className="text-gray-600">{opt}</li>
-                  ))}
-                </ul>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isLoading || !query.trim()}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    'Analyze Query'
+                  )}
+                </button>
               </div>
-            </div>
+            </form>
+
+            {error && (
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Analysis Result */}
+          {analysisResult && (
+            <div className="mt-8">
+              <QueryAnalysisDisplay queryInput={analysisResult} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
-export default QueryAnalysisDisplay;
+export default QueryIntentAnalysis;
