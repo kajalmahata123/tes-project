@@ -13,10 +13,11 @@ interface SchemaAnalysisResult {
 }
 
 interface SchemaAnalysisProps {
-  connectionId: string | number;
+  connectionId?: string | number;
 }
 
-const SchemaAnalysis: React.FC<SchemaAnalysisProps> = ({ connectionId }) => {
+// Setting default props
+const SchemaAnalysis: React.FC<SchemaAnalysisProps> = ({ connectionId = 2 }) => {
   const [expandedTables, setExpandedTables] = useState<string[]>([]);
   const [analysisResult, setAnalysisResult] = useState<SchemaAnalysisResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -34,8 +35,6 @@ const SchemaAnalysis: React.FC<SchemaAnalysisProps> = ({ connectionId }) => {
 
   useEffect(() => {
     const fetchSchemaAnalysis = async () => {
-      if (!connectionId) return;
-      
       setIsLoading(true);
       setError(null);
       try {
@@ -80,7 +79,6 @@ const SchemaAnalysis: React.FC<SchemaAnalysisProps> = ({ connectionId }) => {
     return null;
   }
 
-  // Function to format analysis text with proper line breaks
   const formatAnalysis = (text: string) => {
     return text.split('\\n').map((line, index) => (
       <React.Fragment key={index}>
