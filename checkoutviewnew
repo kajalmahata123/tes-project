@@ -1,0 +1,163 @@
+import React from 'react';
+import { ArrowRight, ArrowLeft } from 'lucide-react';
+import { FaPlane, FaShoppingCart, FaApple, FaUtensils } from 'react-icons/fa'; // Import your icons
+
+// Define types for better type safety
+interface CategoryItem {
+  name: string;
+  price: number;
+  description: string;
+  icon: React.ReactNode; // Now it's 'icon', not 'image'
+}
+
+interface CategoryData {
+  title: string;
+  gradient: string;
+  items: CategoryItem[];
+}
+
+interface CategoryPreviewData {
+  [key: string]: CategoryData;
+}
+
+const CATEGORY_PREVIEW: CategoryPreviewData = {
+  airlines: {
+    title: "Flight Tickets",
+    gradient: "from-blue-500 to-indigo-600",
+    items: [
+      {
+        name: "NYC → LDN",
+        price: 2499.99,
+        description: "Business Class, Emirates",
+        icon: <FaPlane size={30} />, // Use the icon component
+      },
+      {
+        name: "LAX → TYO",
+        price: 3299.99,
+        description: "First Class, ANA",
+        icon: <FaPlane size={30} />,
+      },
+    ],
+  },
+  grocery: {
+    title: "Whole Foods",
+    gradient: "from-green-500 to-emerald-600",
+    items: [
+      {
+        name: "Fresh Produce Bundle",
+        price: 89.99,
+        description: "Organic Selection",
+        icon: <FaShoppingCart size={30} />,
+      },
+      {
+        name: "Premium Dairy",
+        price: 45.50,
+        description: "Farm Fresh",
+        icon: <FaShoppingCart size={30} />,
+      },
+    ],
+  },
+  bigticket: {
+    title: "Apple Store",
+    gradient: "from-purple-500 to-indigo-500",
+    items: [
+      {
+        name: "iPhone 15 Pro Max",
+        price: 1299.99,
+        description: "256GB Titanium",
+        icon: <FaApple size={30} />,
+      },
+      {
+        name: "MacBook Pro",
+        price: 2499.99,
+        description: "14-inch M3 Pro",
+        icon: <FaApple size={30} />,
+      },
+    ],
+  },
+  dining: {
+    title: "Fine Dining",
+    gradient: "from-red-500 to-pink-600",
+    items: [
+      {
+        name: "Gourmet Dinner",
+        price: 199.99,
+        description: "5-course meal at a Michelin-star restaurant",
+        icon: <FaUtensils size={30} />,
+      },
+      {
+        name: "Wine Tasting",
+        price: 89.99,
+        description: "Selection of premium wines",
+        icon: <FaUtensils size={30} />,
+      },
+    ],
+  },
+};
+
+interface CheckoutPreviewProps {
+  categoryId: string;
+  onBack: () => void;
+  onProceedToPayment: (amount: number) => void;
+}
+
+const CheckoutPreview: React.FC<CheckoutPreviewProps> = ({ categoryId, onBack, onProceedToPayment }) => {
+  const category = CATEGORY_PREVIEW[categoryId];
+  if (!category) {
+    return <div>Category not found.</div>;
+  }
+
+  const total = category.items.reduce((sum, item) => sum + item.price, 0);
+
+  return (
+    <div className="h-full bg-white">
+      <div className={`h-64 bg-gradient-to-r ${category.gradient} relative`}>
+        <button
+          onClick={onBack}
+          className="absolute top-4 left-4 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm"
+        >
+          <ArrowLeft className="w-6 h-6 text-white" />
+        </button>
+
+        <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
+          <h2 className="text-2xl font-bold mb-1">{category.title}</h2>
+          <p className="opacity-90">Order Preview</p>
+        </div>
+      </div>
+
+      <div className="p-6 -mt-6 rounded-t-3xl bg-white relative">
+        <div className="space-y-6">
+          {category.items.map((item, index) => (
+            <div key={index} className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center">
+                {item.icon} {/* Directly render the icon */}
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium">{item.name}</h3>
+                <p className="text-sm text-gray-500">{item.description}</p>
+              </div>
+              <p className="font-medium">${item.price.toFixed(2)}</p>
+            </div>
+          ))}
+
+          {/* ... (rest of the code remains the same) */}
+          <button
+
+onClick={() => onProceedToPayment(total)}
+
+className="w-full bg-blue-500 text-white py-4 rounded-xl font-medium transform transition-all duration-200 hover:bg-blue-600 active:scale-[0.98] flex items-center justify-center gap-2"
+
+>
+
+<span>Continue to Payment</span>
+
+<ArrowRight className="w-5 h-5" />
+
+</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CheckoutPreview;
