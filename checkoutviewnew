@@ -1,155 +1,262 @@
-import React from 'react';
-import { ArrowRight, ArrowLeft, Plane, ShoppingCart, Apple, Utensils } from 'lucide-react';
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import Dict, List, Optional, Any
+from anthropic import Anthropic
+import os
+import json
 
-// Define types for better type safety
-interface CategoryItem {
-  name: string;
-  price: number;
-  description: string;
-  icon: React.ReactNode;
-}
+from starlette.middleware.cors import CORSMiddleware
 
-interface CategoryData {
-  title: string;
-  gradient: string;
-  items: CategoryItem[];
-}
+app = FastAPI(title="Payment Analysis API")
 
-interface CategoryPreviewData {
-  [key: string]: CategoryData;
-}
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-const CATEGORY_PREVIEW: CategoryPreviewData = {
-  airlines: {
-    title: "Flight Tickets",
-    gradient: "from-blue-500 to-indigo-600",
-    items: [
-      {
-        name: "NYC → LDN",
-        price: 2499.99,
-        description: "Business Class, Emirates",
-        icon: <Plane size={30} />,
-      },
-      {
-        name: "LAX → TYO",
-        price: 3299.99,
-        description: "First Class, ANA",
-        icon: <Plane size={30} />,
-      },
-    ],
-  },
-  grocery: {
-    title: "Whole Foods",
-    gradient: "from-green-500 to-emerald-600",
-    items: [
-      {
-        name: "Fresh Produce Bundle",
-        price: 89.99,
-        description: "Organic Selection",
-        icon: <ShoppingCart size={30} />,
-      },
-      {
-        name: "Premium Dairy",
-        price: 45.50,
-        description: "Farm Fresh",
-        icon: <ShoppingCart size={30} />,
-      },
-    ],
-  },
-  bigticket: {
-    title: "Apple Store",
-    gradient: "from-purple-500 to-indigo-500",
-    items: [
-      {
-        name: "iPhone 15 Pro Max",
-        price: 1299.99,
-        description: "256GB Titanium",
-        icon: <Apple size={30} />,
-      },
-      {
-        name: "MacBook Pro",
-        price: 2499.99,
-        description: "14-inch M3 Pro",
-        icon: <Apple size={30} />,
-      },
-    ],
-  },
-  dining: {
-    title: "Fine Dining",
-    gradient: "from-red-500 to-pink-600",
-    items: [
-      {
-        name: "Gourmet Dinner",
-        price: 199.99,
-        description: "5-course meal at a Michelin-star restaurant",
-        icon: <Utensils size={30} />,
-      },
-      {
-        name: "Wine Tasting",
-        price: 89.99,
-        description: "Selection of premium wines",
-        icon: <Utensils size={30} />,
-      },
-    ],
-  },
-};
 
-interface CheckoutPreviewProps {
-  categoryId: string;
-  onBack: () => void;
-  onProceedToPayment: (amount: number) => void;
-}
+# Pydantic models
+class TransactionData(BaseModel):
+    amount: float
+    user_id: str
+    merchant: str
+    category: str
 
-const CheckoutPreview: React.FC<CheckoutPreviewProps> = ({ categoryId, onBack, onProceedToPayment }) => {
-  const category = CATEGORY_PREVIEW[categoryId];
-  if (!category) {
-    return <div>Category not found.</div>;
-  }
 
-  const total = category.items.reduce((sum, item) => sum + item.price, 0);
+# Sample card data with three tiers
+SAMPLE_CARDS = [
+    {
+        "id": 1,
+        "type": "Credit Card",
+        "network": "VISA",
+        "tier": "Signature",
+        "last4": "5678",
+        "color": "bg-emerald-400",
+        "expiry": "04/28",
+        "baseRewards": {
+            "default": 1,
+            "Electronics": 2,
+            "Travel": 3
+        },
+        "benefits": {
+            "rewards": {
+                "details": "2X points on Electronics",
+                "rate": "2 points per $1 spent",
+                "additionalInfo": [
+                    "Points worth $0.01 each",
+                    "No minimum redemption",
+                    "Transfer to travel partners"
+                ]
+            },
+            "miles": {
+                "details": "3X miles on Travel",
+                "rate": "3 miles per $1 spent",
+                "additionalInfo": [
+                    "Miles worth $0.015 each",
+                    "No blackout dates",
+                    "Book any airline"
+                ]
+            }
+        }
+    },
+    {
+        "id": 2,
+        "type": "Credit Card",
+        "network": "VISA",
+        "tier": "Infinite",
+        "last4": "0910",
+        "color": "bg-blue-400",
+        "expiry": "05/27",
+        "baseRewards": {
+            "default": 1.5,
+            "Electronics": 2.5,
+            "Dining": 3
+        },
+        "benefits": {
+            "cashback": {
+                "details": "2.5% cashback on Electronics",
+                "rate": "2.5% on category purchases",
+                "additionalInfo": [
+                    "Premium concierge service",
+                    "Priority Pass lounge access",
+                    "Global entry credit"
+                ]
+            },
+            "installment": {
+                "details": "0% APR installment plans",
+                "rate": "0% APR for 6 months",
+                "additionalInfo": [
+                    "No foreign transaction fees",
+                    "Travel insurance included",
+                    "Purchase protection"
+                ]
+            }
+        }
+    },
+    {
+        "id": 3,
+        "type": "Credit Card",
+        "network": "VISA",
+        "tier": "Platinum",
+        "last4": "3456",
+        "color": "bg-gray-400",
+        "expiry": "09/26",
+        "baseRewards": {
+            "default": 1,
+            "Electronics": 1.5,
+            "Groceries": 2
+        },
+        "benefits": {
+            "rewards": {
+                "details": "1.5X points on Electronics",
+                "rate": "1.5 points per $1 spent",
+                "additionalInfo": [
+                    "Basic travel insurance",
+                    "Extended warranty",
+                    "Purchase protection"
+                ]
+            },
+            "cashback": {
+                "details": "1% cashback",
+                "rate": "1% on all purchases",
+                "additionalInfo": [
+                    "Automatic redemption",
+                    "$25 minimum redemption",
+                    "Statement credit only"
+                ]
+            }
+        }
+    }
+]
 
-  return (
-    <div className="h-full bg-white">
-      <div className={`h-64 bg-gradient-to-r ${category.gradient} relative`}>
-        <button
-          onClick={onBack}
-          className="absolute top-4 left-4 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm"
-        >
-          <ArrowLeft className="w-6 h-6 text-white" />
-        </button>
 
-        <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-          <h2 className="text-2xl font-bold mb-1">{category.title}</h2>
-          <p className="opacity-90">Order Preview</p>
-        </div>
-      </div>
+def analyze_with_claude(transaction: TransactionData) -> Dict:
+    """Analyze transaction using Claude to calculate optimal rewards."""
+    anthropic = Anthropic(api_key='sk-ant-api03-PwatQ9I-LgPb4KRRg2dtWvILpu_sChEws7xb7z')
 
-      <div className="p-6 -mt-6 rounded-t-3xl bg-white relative">
-        <div className="space-y-6">
-          {category.items.map((item, index) => (
-            <div key={index} className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center">
-                {item.icon}
-              </div>
-              <div className="flex-1">
-                <h3 className="font-medium">{item.name}</h3>
-                <p className="text-sm text-gray-500">{item.description}</p>
-              </div>
-              <p className="font-medium">${item.price.toFixed(2)}</p>
-            </div>
-          ))}
+    prompt = f"""You are a rewards analysis expert. For this purchase transaction, calculate the exact value of each benefit type per card.
 
-          <button
-            onClick={() => onProceedToPayment(total)}
-            className="w-full bg-blue-500 text-white py-4 rounded-xl font-medium transform transition-all duration-200 hover:bg-blue-600 active:scale-[0.98] flex items-center justify-center gap-2"
-          >
-            <span>Continue to Payment</span>
-            <ArrowRight className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-};
+Transaction:
+- Amount: ${transaction.amount}
+- Merchant: {transaction.merchant}
+- Category: {transaction.category}
 
-export default CheckoutPreview;
+Available Cards:
+{json.dumps(SAMPLE_CARDS, indent=2)}
+
+Calculate and format response as JSON:
+{{
+  "cards": [
+    {{
+      "id": card_id,
+      "type": card_type,
+      "network": card_network,
+      "tier": card_tier,
+      "last4": last_4_digits,
+      "color": card_color,
+      "expiry": card_expiry,
+      "benefits": {{
+        "rewards": {{  // if card has rewards
+          "details": "X points = $Y value",
+          "rate": "earning rate description",
+          "value": reward_value_in_dollars,
+          "additionalInfo": [...]
+        }},
+        "miles": {{  // if card has miles
+          "details": "X miles = $Y value",
+          "rate": "earning rate description",
+          "value": miles_value_in_dollars,
+          "additionalInfo": [...]
+        }},
+        "cashback": {{  // if card has cashback
+          "details": "X% = $Y cashback",
+          "rate": "earning rate description",
+          "value": cashback_amount,
+          "additionalInfo": [...]
+        }},
+        "installment": {{  // if card has installment
+          "details": "X months at $Y/month",
+          "rate": "APR description",
+          "value": monthly_payment_amount,
+          "additionalInfo": [...]
+        }}
+      }},
+      "best_value": {{
+        "type": "rewards|miles|cashback|installment",
+        "value": highest_benefit_value,
+        "description": "Why this is the best option"
+      }},
+      "total_value": total_benefits_value,
+      "effective_rate": total_effective_percentage
+    }}
+  ],
+  "recommended_card": {{
+    "id": card_id_with_highest_value,
+    "reason": "Explanation why this card is recommended"
+  }},
+  "transaction": transaction_details,
+  "status": "success"
+}}
+
+Focus on calculating accurate dollar values for each benefit type. For points and miles, use their cash equivalent values."""
+
+    try:
+        response = anthropic.messages.create(
+            model="claude-3-sonnet-20240229",
+            max_tokens=3000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        data=extract_json_from_text(response.content[0].text)
+        print(data)
+        return json.loads(data)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to analyze with Claude: {str(e)}"
+        )
+
+
+@app.post("/api/analyze-purchase")
+async def analyze_purchase(transaction: TransactionData) -> Dict:
+    """Analyze purchase transaction and return optimized card recommendations."""
+    try:
+        return analyze_with_claude(transaction)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/cards")
+async def get_cards():
+    """Return available payment cards."""
+    return {"cards": SAMPLE_CARDS}
+
+
+def extract_json_from_text(text: str) -> str:
+   import re
+   match = re.search(r'```json\n(.*?)```', text, re.DOTALL)
+   if match:
+       json_str = match.group(1).strip()
+       json_str = json_str.replace('%', '')
+       return json_str
+   return text
+
+
+def _extract_json_response( content: str) -> Dict[str, Any]:
+    """Extract and parse JSON from Claude's response"""
+    try:
+        # Look for JSON structure in the response
+        import re
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            return json.loads(json_match.group())
+        return {}
+    except Exception as e:
+           # logger.error(f"Error parsing Claude response: {str(e)}")
+        return {}
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)
