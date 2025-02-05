@@ -1,1 +1,199 @@
+import React from 'react';
+import { ArrowLeft, Battery, Signal, Wifi } from 'lucide-react';
 
+interface Card {
+  id: number;
+  type: string;
+  network: string;
+  tier: string;
+  last4: string;
+  color: string;
+  expiry: string;
+  baseRewards: {
+    default: number;
+    [key: string]: number;
+  };
+}
+
+const SAMPLE_CARDS: Card[] = [
+  {
+    id: 1,
+    type: "Credit Card",
+    network: "VISA",
+    tier: "Signature",
+    last4: "5678",
+    color: "bg-emerald-400",
+    expiry: "04/28",
+    baseRewards: {
+      default: 1,
+      Electronics: 2,
+      Travel: 3
+    }
+  },
+  {
+    id: 2,
+    type: "Credit Card",
+    network: "VISA",
+    tier: "Infinite",
+    last4: "0910",
+    color: "bg-blue-400",
+    expiry: "05/27",
+    baseRewards: {
+      default: 1.5,
+      Electronics: 2.5,
+      Dining: 3
+    }
+  },
+  {
+    id: 3,
+    type: "Credit Card",
+    network: "VISA",
+    tier: "Platinum",
+    last4: "3456",
+    color: "bg-gray-400",
+    expiry: "09/26",
+    baseRewards: {
+      default: 1,
+      Electronics: 1.5,
+      Groceries: 2
+    }
+  }
+];
+
+const PaymentView = () => {
+  const amount = 999.99;
+  const merchant = "Apple Store";
+  const category = "Electronics";
+  const [selectedMethod, setSelectedMethod] = React.useState<number | null>(null);
+  const [expandedCard, setExpandedCard] = React.useState<number | null>(null);
+
+  return (
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+      <div className="w-[393px] h-[852px] bg-black rounded-[60px] shadow-xl overflow-hidden relative border-8 border-black">
+        {/* Dynamic Island */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[35px] w-[126px] bg-black rounded-b-[18px] z-50 mt-2">
+          <div className="absolute top-[10px] w-[90px] h-[9px] bg-neutral-900 rounded-[18px] left-1/2 -translate-x-1/2" />
+          <div className="absolute right-[22px] top-[7px] w-[13px] h-[13px] rounded-full bg-neutral-950" />
+        </div>
+
+        {/* Screen Content */}
+        <div className="h-full w-full bg-white rounded-[50px] overflow-hidden">
+          {/* Status Bar */}
+          <div className="h-12 bg-white flex items-center justify-between px-6 pt-2">
+            <div className="text-sm font-medium">9:41</div>
+            <div className="flex items-center space-x-2">
+              <Signal className="w-4 h-4" />
+              <Wifi className="w-4 h-4" />
+              <Battery className="w-4 h-4" />
+            </div>
+          </div>
+
+          {/* Main Content Area */}
+          <div className="relative h-[calc(100%-3rem)]">
+            <div className="h-full overflow-y-auto">
+              <div className="flex flex-col h-full">
+                <div className="flex-1">
+                  <div className="border-b border-gray-100">
+                    <div className="px-5 py-4 flex items-center gap-3">
+                      <button className="hover:bg-gray-50 rounded-full p-1">
+                        <ArrowLeft className="w-5 h-5 text-gray-600" />
+                      </button>
+                      <h1 className="text-xl font-medium">Select Payment Method</h1>
+                    </div>
+
+                    <div className="px-5 py-3 flex items-center justify-between border-t border-gray-100">
+                      <div className="text-sm text-gray-600">
+                        {merchant} - {category}
+                      </div>
+                      <span className="text-base font-medium">${amount.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  <div className="p-5 space-y-4">
+                    {SAMPLE_CARDS.map(card => (
+                      <div key={card.id} className="border border-gray-200 rounded-2xl shadow-sm">
+                        <button
+                          onClick={() => setSelectedMethod(card.id)}
+                          className="w-full flex items-center p-4"
+                        >
+                          <input
+                            type="radio"
+                            checked={selectedMethod === card.id}
+                            onChange={() => setSelectedMethod(card.id)}
+                            className="w-4 h-4 border-gray-300"
+                          />
+
+                          <div className={`w-12 h-8 ${card.color} rounded-xl ml-3 flex items-center justify-center`}>
+                            <span className="text-white text-xs font-medium">{card.network}</span>
+                          </div>
+
+                          <div className="ml-3 flex-1">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium">{card.network} {card.tier}</p>
+                                <p className="text-xs text-gray-500">•••• {card.last4}</p>
+                              </div>
+                              <button 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setExpandedCard(expandedCard === card.id ? null : card.id);
+                                }}
+                                className="p-2 text-gray-400"
+                              >
+                                <svg 
+                                  xmlns="http://www.w3.org/2000/svg" 
+                                  className={`w-5 h-5 transition-transform ${
+                                    expandedCard === card.id ? 'rotate-90' : ''
+                                  }`}
+                                  viewBox="0 0 24 24" 
+                                  fill="none" 
+                                  stroke="currentColor" 
+                                  strokeWidth="2" 
+                                  strokeLinecap="round" 
+                                  strokeLinejoin="round"
+                                >
+                                  <polyline points="9 18 15 12 9 6"/>
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </button>
+
+                        {expandedCard === card.id && (
+                          <div className="px-4 pb-4">
+                            <div className="p-3 bg-gray-50 rounded-xl">
+                              <p className="text-sm font-medium">Card Details</p>
+                              <p className="text-xs text-gray-600 mt-1">Expires: {card.expiry}</p>
+                              <p className="text-xs text-gray-600">Rewards Rate: {card.baseRewards[category] || card.baseRewards.default}x points on {category}</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bottom Button - Contained within scroll area */}
+                <div className="bg-white border-t border-gray-100 mt-auto">
+                  <div className="px-5 py-4 pb-8">
+                    <button 
+                      className="w-full bg-black text-white py-3.5 rounded-2xl font-medium disabled:bg-gray-300"
+                      disabled={!selectedMethod}
+                    >
+                      Continue to Payment
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Home Indicator */}
+            <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-[134px] h-[5px] bg-neutral-200 rounded-full" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default PaymentView;
