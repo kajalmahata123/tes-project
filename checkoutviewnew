@@ -1,13 +1,12 @@
 import React from 'react';
-import { ArrowRight, ArrowLeft } from 'lucide-react';
-import { FaPlane, FaShoppingCart, FaApple, FaUtensils } from 'react-icons/fa'; // Import your icons
+import { ArrowRight, ArrowLeft, Plane, ShoppingCart, Apple, Utensils } from 'lucide-react';
 
 // Define types for better type safety
 interface CategoryItem {
   name: string;
   price: number;
   description: string;
-  icon: React.ReactNode; // Now it's 'icon', not 'image'
+  icon: React.ReactNode;
 }
 
 interface CategoryData {
@@ -29,13 +28,13 @@ const CATEGORY_PREVIEW: CategoryPreviewData = {
         name: "NYC → LDN",
         price: 2499.99,
         description: "Business Class, Emirates",
-        icon: <FaPlane size={30} />, // Use the icon component
+        icon: <Plane size={30} />,
       },
       {
         name: "LAX → TYO",
         price: 3299.99,
         description: "First Class, ANA",
-        icon: <FaPlane size={30} />,
+        icon: <Plane size={30} />,
       },
     ],
   },
@@ -47,13 +46,13 @@ const CATEGORY_PREVIEW: CategoryPreviewData = {
         name: "Fresh Produce Bundle",
         price: 89.99,
         description: "Organic Selection",
-        icon: <FaShoppingCart size={30} />,
+        icon: <ShoppingCart size={30} />,
       },
       {
         name: "Premium Dairy",
         price: 45.50,
         description: "Farm Fresh",
-        icon: <FaShoppingCart size={30} />,
+        icon: <ShoppingCart size={30} />,
       },
     ],
   },
@@ -65,13 +64,13 @@ const CATEGORY_PREVIEW: CategoryPreviewData = {
         name: "iPhone 15 Pro Max",
         price: 1299.99,
         description: "256GB Titanium",
-        icon: <FaApple size={30} />,
+        icon: <Apple size={30} />,
       },
       {
         name: "MacBook Pro",
         price: 2499.99,
         description: "14-inch M3 Pro",
-        icon: <FaApple size={30} />,
+        icon: <Apple size={30} />,
       },
     ],
   },
@@ -83,13 +82,13 @@ const CATEGORY_PREVIEW: CategoryPreviewData = {
         name: "Gourmet Dinner",
         price: 199.99,
         description: "5-course meal at a Michelin-star restaurant",
-        icon: <FaUtensils size={30} />,
+        icon: <Utensils size={30} />,
       },
       {
         name: "Wine Tasting",
         price: 89.99,
         description: "Selection of premium wines",
-        icon: <FaUtensils size={30} />,
+        icon: <Utensils size={30} />,
       },
     ],
   },
@@ -130,7 +129,7 @@ const CheckoutPreview: React.FC<CheckoutPreviewProps> = ({ categoryId, onBack, o
           {category.items.map((item, index) => (
             <div key={index} className="flex items-center gap-4">
               <div className="w-16 h-16 bg-gray-100 rounded-xl flex items-center justify-center">
-                {item.icon} {/* Directly render the icon */}
+                {item.icon}
               </div>
               <div className="flex-1">
                 <h3 className="font-medium">{item.name}</h3>
@@ -140,20 +139,13 @@ const CheckoutPreview: React.FC<CheckoutPreviewProps> = ({ categoryId, onBack, o
             </div>
           ))}
 
-          {/* ... (rest of the code remains the same) */}
           <button
-
-onClick={() => onProceedToPayment(total)}
-
-className="w-full bg-blue-500 text-white py-4 rounded-xl font-medium transform transition-all duration-200 hover:bg-blue-600 active:scale-[0.98] flex items-center justify-center gap-2"
-
->
-
-<span>Continue to Payment</span>
-
-<ArrowRight className="w-5 h-5" />
-
-</button>
+            onClick={() => onProceedToPayment(total)}
+            className="w-full bg-blue-500 text-white py-4 rounded-xl font-medium transform transition-all duration-200 hover:bg-blue-600 active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            <span>Continue to Payment</span>
+            <ArrowRight className="w-5 h-5" />
+          </button>
         </div>
       </div>
     </div>
