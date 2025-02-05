@@ -1,0 +1,267 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  ChevronDown, 
+  ChevronUp, 
+  Database, 
+  GitBranch, 
+  Terminal, 
+  AlertCircle,
+  GitFork,
+  Loader2
+} from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+const SectionHeader = ({ title, isExpanded, onToggle, icon: Icon }) => (
+  <div 
+    onClick={onToggle}
+    className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
+  >
+    <div className="flex items-center gap-2">
+      <Icon className="w-5 h-5 text-blue-600" />
+      <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+    </div>
+    {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+  </div>
+);
+
+const LoadingState = () => (
+  <div className="flex items-center justify-center p-8">
+    <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+    <span className="ml-2 text-gray-600">Analyzing query...</span>
+  </div>
+);
+
+const ErrorState = ({ error }) => (
+  <Alert variant="destructive" className="m-4">
+    <AlertDescription>
+      {error || 'Failed to analyze query. Please try again.'}
+    </AlertDescription>
+  </Alert>
+);
+
+const QueryAnalysisDisplay = ({ queryInput }) => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [expandedSections, setExpandedSections] = useState({
+    understanding: true,
+    steps: true,
+    sql: true,
+    alternatives: false,
+    complexity: false
+  });
+
+  useEffect(() => {
+    const fetchAnalysis = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch('/api/analyze-query', {  // Replace with your actual API endpoint
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query: queryInput }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        setData(result);
+      } catch (err) {
+        setError(err.message);
+        console.error('Error fetching query analysis:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (queryInput) {
+      fetchAnalysis();
+    }
+  }, [queryInput]);
+
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const getComplexityColor = (level) => {
+    switch(level) {
+      case 'simple': return 'text-green-600';
+      case 'moderate': return 'text-yellow-600';
+      case 'complex': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  if (loading) {
+    return <LoadingState />;
+  }
+
+  if (error) {
+    return <ErrorState error={error} />;
+  }
+
+  if (!data) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4 bg-white rounded-lg shadow">
+      {/* Query Understanding Section */}
+      <div className="border-b">
+        <SectionHeader 
+          title="Query Understanding"
+          isExpanded={expandedSections.understanding}
+          onToggle={() => toggleSection('understanding')}
+          icon={Database}
+        />
+        {expandedSections.understanding && (
+          <div className="p-4">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="font-medium text-gray-900 mb-2">Identified Entities</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  {data.query_understanding.identified_entities.map((entity, idx) => (
+                    <li key={idx} className="text-gray-600">{entity}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-900 mb-2">Relationships</h3>
+                {data.query_understanding.relationships.length > 0 ? (
+                  <ul className="list-disc pl-5 space-y-1">
+                    {data.query_understanding.relationships.map((rel, idx) => (
+                      <li key={idx} className="text-gray-600">{rel}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-gray-600">No relationships identified</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Transformation Steps */}
+      <div className="border-b">
+        <SectionHeader 
+          title="Transformation Steps"
+          isExpanded={expandedSections.steps}
+          onToggle={() => toggleSection('steps')}
+          icon={GitBranch}
+        />
+        {expandedSections.steps && (
+          <div className="p-4">
+            <div className="space-y-6">
+              {data.transformation_steps.map((step, idx) => (
+                <div key={idx} className="border-l-2 border-blue-500 pl-4">
+                  <h3 className="font-medium text-gray-900">
+                    Step {step.step}: {step.action}
+                  </h3>
+                  <p className="text-gray-600 mt-1">{step.explanation}</p>
+                  <code className="block bg-gray-50 p-3 mt-2 rounded text-sm overflow-x-auto">
+                    {step.sql_component}
+                  </code>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Generated SQL */}
+      <div className="border-b">
+        <SectionHeader 
+          title="Generated SQL"
+          isExpanded={expandedSections.sql}
+          onToggle={() => toggleSection('sql')}
+          icon={Terminal}
+        />
+        {expandedSections.sql && (
+          <div className="p-4 space-y-4">
+            <code className="block bg-gray-50 p-4 rounded text-sm overflow-x-auto whitespace-pre-wrap">
+              {data.generated_sql}
+            </code>
+            <div className="bg-blue-50 p-4 rounded">
+              <p className="text-gray-700">{data.natural_explanation}</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Alternative Approaches */}
+      <div className="border-b">
+        <SectionHeader 
+          title="Alternative Approaches"
+          isExpanded={expandedSections.alternatives}
+          onToggle={() => toggleSection('alternatives')}
+          icon={GitFork}
+        />
+        {expandedSections.alternatives && (
+          <div className="p-4">
+            <div className="space-y-6">
+              {data.alternative_approaches.map((approach, idx) => (
+                <div key={idx} className="border-l-2 border-gray-300 pl-4">
+                  <code className="block bg-gray-50 p-3 rounded text-sm overflow-x-auto">
+                    {approach.sql}
+                  </code>
+                  <p className="mt-2 text-gray-700">{approach.explanation}</p>
+                  <p className="mt-1 text-gray-500 text-sm">{approach.trade_offs}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Complexity Analysis */}
+      <div>
+        <SectionHeader 
+          title="Complexity Analysis"
+          isExpanded={expandedSections.complexity}
+          onToggle={() => toggleSection('complexity')}
+          icon={AlertCircle}
+        />
+        {expandedSections.complexity && (
+          <div className="p-4">
+            <div className="space-y-4">
+              <div className="flex items-center">
+                <span className="font-medium mr-2">Complexity Level:</span>
+                <span className={`${getComplexityColor(data.complexity_analysis.level)} font-medium`}>
+                  {data.complexity_analysis.level.toUpperCase()}
+                </span>
+              </div>
+              
+              <div>
+                <h3 className="font-medium text-gray-900 mb-2">Contributing Factors</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  {data.complexity_analysis.factors.map((factor, idx) => (
+                    <li key={idx} className="text-gray-600">{factor}</li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="font-medium text-gray-900 mb-2">Optimization Opportunities</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  {data.complexity_analysis.optimization_opportunities.map((opt, idx) => (
+                    <li key={idx} className="text-gray-600">{opt}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default QueryAnalysisDisplay;
