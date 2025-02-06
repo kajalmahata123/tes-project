@@ -1,0 +1,32 @@
+async def execute_query(self, connection_data: Dict[str, Any], query: str = "SELECT 1") -> pd.DataFrame:
+   """Test database connection and execute query.
+   
+   Args:
+       connection_data: Database connection parameters
+       query: SQL query to execute (defaults to "SELECT 1")
+       
+   Returns:
+       pandas.DataFrame with query results
+       
+   Raises:
+       ValueError: If connection fails or query execution fails
+   """
+   try:
+       config = connection_data['database_config']
+       credentials = connection_data.get('credentials', {})
+       vendor = connection_data['vendor']
+
+       if vendor == DatabaseVendor.MYSQL:
+           conn_str = f"mysql+pymysql://{credentials.get('username')}:{credentials.get('password')}@{config['host']}:{config['port']}/{config['database_name']}"
+       elif vendor == DatabaseVendor.POSTGRESQL:
+           conn_str = f"postgresql://{credentials.get('username')}:{credentials.get('password')}@{config['host']}:{config['port']}/{config['database_name']}"
+       else:
+           raise ValueError(f"Unsupported vendor: {vendor}")
+
+       engine = sqlalchemy.create_engine(conn_str)
+       with engine.connect() as conn:
+           df = pd.read_sql(query, conn)
+           return df
+
+   except Exception as e:
+       raise ValueError(f"Connection test failed: {str(e)}")
