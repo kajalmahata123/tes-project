@@ -63,7 +63,19 @@ interface AnalysisResults {
 
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042'];
 
-const QueryEditor: React.FC = () => {
+interface Database {
+  id: string;
+  name: string;
+  // Add other database properties as needed
+}
+
+interface QueryEditorProps {
+  db: Database;
+  fetchDatasources: () => Promise<void>;
+  authFetch: <T>(url: string, options?: RequestInit) => Promise<T>;
+}
+
+const QueryEditor: React.FC<QueryEditorProps> = ({ db, fetchDatasources, authFetch }) => {
   const [query, setQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('query');
   const [analysisResults, setAnalysisResults] = useState<AnalysisResults | null>(null);
@@ -76,7 +88,7 @@ const QueryEditor: React.FC = () => {
   useEffect(() => {
     const fetchSuggestions = async () => {
       try {
-        const response = await fetch('/api/suggested-queries');
+        const response = await authFetch<{ suggestions: string[] }>('/api/suggested-queries');
         if (!response.ok) {
           throw new Error('Failed to fetch suggestions');
         }
@@ -90,19 +102,40 @@ const QueryEditor: React.FC = () => {
     fetchSuggestions();
   }, []);
 
+  const [isImportingSchema, setIsImportingSchema] = useState(false);
+
+  const handleImportSchema = async () => {
+    setIsImportingSchema(true);
+    setError(null);
+
+    try {
+      const response = await authFetch<any>(`/datasources/${db.id}/schema/import`, {
+        method: 'POST'
+      });
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      // Refresh datasources to get updated schema information
+      fetchDatasources();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Schema import failed');
+    } finally {
+      setIsImportingSchema(false);
+    }
+  };
+
   const handleSubmit = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await fetch('/api/analyze-query', {
+      const response = await authFetch<AnalysisResults>('/api/analyze-query', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ 
           query_text: query,
-          connection_id: 'default' // You can make this dynamic based on your needs
+          connection_id: db.id
         }),
       });
 
@@ -127,6 +160,16 @@ const QueryEditor: React.FC = () => {
 
       {/* Query Input */}
       <div className="border border-gray-200 rounded-lg p-4 mb-4">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-medium">Database: {db.name}</h2>
+          <button
+            onClick={handleImportSchema}
+            disabled={isImportingSchema}
+            className="px-4 py-2 bg-gray-100 border border-gray-200 rounded-lg hover:bg-gray-200 disabled:opacity-50 flex items-center gap-2"
+          >
+            {isImportingSchema ? 'Importing Schema...' : 'Import Schema'} 
+          </button>
+        </div>
         <textarea
           value={query}
           onChange={(e) => setQuery(e.target.value)}
