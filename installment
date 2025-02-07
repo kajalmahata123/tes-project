@@ -1,26 +1,523 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Database as DatabaseIcon, Activity, Clock, Users, ArrowRight, Database } from 'lucide-react';
+import { authFetch } from '../utils/api';
 
-const InstallmentIcon = ({ size = 24, color = "currentColor" }) => {
+interface DatabaseCredentials {
+  username?: string;
+  password?: string;
+  access_key?: string;
+  secret_key?: string;
+  token?: string;
+  service_account_json?: Record<string, any>;
+  certificate?: string;
+}
+
+interface DatabaseConfig {
+  host?: string;
+  port?: number;
+  database_name: string;
+  db_schema?: string;
+  params: Record<string, any>;
+  connection_timeout: number;
+  query_timeout: number;
+  pool_size: number;
+  max_overflow: number;
+  pool_timeout: number;
+  pool_recycle: number;
+  ssl_enabled: boolean;
+  ssl_verify: boolean;
+  ssl_ca?: string;
+}
+
+interface HealthMetrics {
+  id: number;
+  connection_id: number;
+  status: 'healthy' | 'warning' | 'critical';
+  uptime: string;
+  latency: number;
+  connections: number;
+  last_error: string | null;
+  last_checked_at: string;
+  consecutive_failures: number;
+  metrics: {
+    uptime?: string;
+    bytes_sent?: string;
+    bytes_received?: string;
+    total_connections?: number;
+    active_connections?: number;
+    queries_per_second?: number;
+  };
+}
+
+interface Datasource {
+  id: number;
+  name: string;
+  description: string;
+  vendor: string;
+  connection_type: string;
+  is_active: boolean;
+  last_connected_at: string | null;
+  health_metrics: HealthMetrics[];
+}
+
+const StatusBadge: React.FC<{ status: HealthMetrics['status'] }> = ({ status }) => {
+  const statusStyles = {
+    healthy: 'bg-green-100 text-green-800',
+    warning: 'bg-yellow-100 text-yellow-800',
+    critical: 'bg-red-100 text-red-800'
+  };
+
   return (
-    <svg 
-      width={size} 
-      height={size} 
-      viewBox="0 0 24 24"
-    >
-      {/* 25% Circle (Quarter) */}
-      <path 
-        d="M12 4 L20 4 A8 8 0 0 1 20 12 L12 12 Z" 
-        fill={color}
-      />
-      
-      {/* 5 Larger Dashes */}
-      <rect x="8.5" y="6" width="2.5" height="4" fill={color} />
-      <rect x="5" y="9.5" width="4" height="2.5" fill={color} />
-      <rect x="8.5" y="14" width="2.5" height="4" fill={color} />
-      <rect x="12.5" y="14" width="2.5" height="4" fill={color} />
-      <rect x="16.5" y="14" width="2.5" height="4" fill={color} />
-    </svg>
+    <span className={`px-3 py-1 rounded-full text-sm ${statusStyles[status]}`}>
+      {status}
+    </span>
   );
 };
 
-export default InstallmentIcon;
+
+
+const DatabaseHealthCard: React.FC<{ 
+  db: Datasource,
+  fetchDatasources: () => void,
+  authFetch: typeof authFetch
+}> = ({ 
+  db,
+  fetchDatasources,
+  authFetch
+}) => {
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [isImportingSchema, setIsImportingSchema] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const latestMetrics = db.health_metrics[0] || {
+    status: 'warning' as const,
+    uptime: 'N/A',
+    latency: 0,
+    connections: 0
+  };
+
+  const handleTestConnection = async () => {
+    setIsTestingConnection(true);
+    setError(null);
+
+    try {
+      const response = await authFetch<{ message: string }>(`/datasources/${db.id}/test`, {
+        method: 'POST'
+      });
+
+      // Show success message as error (but in green)
+      setError(response.data?.message || 'Connection test successful');
+      
+      // Refresh datasources to get updated health metrics
+     // fetchDatasources();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Connection test failed');
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
+  const handleImportSchema = async () => {
+    setIsImportingSchema(true);
+    setError(null);
+
+    try {
+      const response = await authFetch<any>(`/datasources/${db.id}/schema/import`, {
+        method: 'POST'
+      });
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      // Refresh datasources to get updated schema information
+      fetchDatasources();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Schema import failed');
+    } finally {
+      setIsImportingSchema(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center">
+          <Database className="h-8 w-8 text-blue-600" />
+          <div className="ml-4">
+            <h3 className="text-lg font-medium text-gray-900">{db.name}</h3>
+            <p className="text-sm text-gray-500">{db.vendor}</p>
+          </div>
+        </div>
+        <StatusBadge status={latestMetrics.status} />
+      </div>
+      
+      <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+        <div className="flex items-center">
+          <Clock className="h-4 w-4 text-gray-400 mr-2" />
+          <div>
+            <p className="text-gray-500">Uptime</p>
+            <p className="mt-1 font-medium">{latestMetrics.uptime}</p>
+          </div>
+        </div>
+        <div className="flex items-center">
+          <Activity className="h-4 w-4 text-gray-400 mr-2" />
+          <div>
+            <p className="text-gray-500">Latency</p>
+            <p className="mt-1 font-medium">{latestMetrics.latency}ms</p>
+          </div>
+        </div>
+        <div className="flex items-center">
+          <Users className="h-4 w-4 text-gray-400 mr-2" />
+          <div>
+            <p className="text-gray-500">Connections</p>
+            <p className="mt-1 font-medium">{latestMetrics.connections}</p>
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className={`mt-4 p-3 text-sm rounded-md ${
+          error.toLowerCase().includes('successful') 
+            ? 'bg-green-50 text-green-700' 
+            : 'bg-red-50 text-red-700'
+        }`}>
+          {error}
+        </div>
+      )}
+
+      <div className="mt-6 flex space-x-4">
+        <button
+          onClick={handleTestConnection}
+          disabled={isTestingConnection}
+          className="flex items-center justify-center px-4 py-2 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors duration-150 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isTestingConnection ? 'Testing...' : 'Test Connection'}
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </button>
+        <button
+          onClick={handleImportSchema}
+          disabled={isImportingSchema}
+          className="flex items-center justify-center px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors duration-150 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isImportingSchema ? 'Importing...' : 'Import Schema'}
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+
+
+const Databases: React.FC = () => {
+  const [datasources, setDatasources] = useState<Datasource[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [listError, setListError] = useState<string | null>(null);
+  const [showNewConnection, setShowNewConnection] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const DATABASE_VENDORS = [
+    { value: 'mysql', label: 'MySQL', defaultPort: 3306 },
+    { value: 'postgresql', label: 'PostgreSQL', defaultPort: 5432 },
+    { value: 'mongodb', label: 'MongoDB', defaultPort: 27017 },
+    { value: 'mssql', label: 'Microsoft SQL Server', defaultPort: 1433 },
+    { value: 'oracle', label: 'Oracle', defaultPort: 1521 },
+    { value: 'clickhouse', label: 'ClickHouse', defaultPort: 8123 },
+    { value: 'redshift', label: 'Amazon Redshift', defaultPort: 5439 },
+    { value: 'snowflake', label: 'Snowflake', defaultPort: 443 }
+  ];
+
+  const CONNECTION_TYPES = {
+    DIRECT: 'direct',
+    SSH_TUNNEL: 'ssh_tunnel',
+    CLOUD_SERVICE: 'cloud_service',
+    IAM: 'iam',
+    SERVICE_ACCOUNT: 'service_account'
+  };
+
+  const [formData, setFormData] = useState({
+    name: '',
+    vendor: '',
+    description: '',
+    connection_type: CONNECTION_TYPES.DIRECT,
+    credentials: {
+      username: '',
+      password: '',
+    },
+    database_config: {
+      host: '',
+      port: 3306,
+      database_name: '',
+    }
+  });
+
+  const handleInputChange = (path: string, value: any) => {
+    setFormData(prev => {
+      const newData = { ...prev };
+      const parts = path.split('.');
+      let current: any = newData;
+      
+      for (let i = 0; i < parts.length - 1; i++) {
+        current = current[parts[i]];
+      }
+      current[parts[parts.length - 1]] = value;
+
+      if (path === 'vendor') {
+        const vendorConfig = DATABASE_VENDORS.find(v => v.value === value);
+        if (vendorConfig) {
+          newData.database_config.port = vendorConfig.defaultPort;
+        }
+      }
+      
+      return newData;
+    });
+  };
+
+  const fetchDatasources = async (activeOnly: boolean = false) => {
+    setIsLoading(true);
+    setListError(null);
+
+    try {
+      const response = await authFetch<Datasource[]>(`/datasources/list?active_only=${activeOnly}`);
+      
+      console.log('API Response:', response); // Debug log
+      
+      // Direct array response, no need to check response.data
+      if (Array.isArray(response)) {
+        setDatasources(response);
+      } else if (response.error) {
+        throw new Error(response.error);
+      } else {
+        setDatasources([]); // Fallback empty array
+      }
+    } catch (err) {
+      console.error('Fetch error:', err); // Debug log
+      setListError(err instanceof Error ? err.message : 'Failed to fetch datasources');
+      setDatasources([]); // Reset datasources on error
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleNewConnection = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+  
+    try {
+      const response = await authFetch<any>('/datasources/create', {
+        method: 'POST',
+        body: JSON.stringify(formData)
+      });
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      if (response.data) {
+        setShowNewConnection(false);
+        fetchDatasources();
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDatasources();
+  }, []);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('Current datasources:', datasources);
+  }, [datasources]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900">Database Management</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage and monitor your database connections
+          </p>
+        </div>
+        <div className="flex space-x-4">
+          <button
+            onClick={() => fetchDatasources(true)}
+            disabled={isLoading}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center disabled:opacity-50"
+          >
+            <Activity size={20} className="mr-2" />
+            {isLoading ? 'Loading...' : 'Refresh'}
+          </button>
+          <button
+            onClick={() => setShowNewConnection(true)}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+          >
+            <Plus size={20} className="mr-2" />
+            New Connection
+          </button>
+        </div>
+      </div>
+
+      {listError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
+          {listError}
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="text-center py-6">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-gray-900 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Loading datasources...</p>
+        </div>
+      ) : datasources && datasources.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {datasources.map((db) => (
+            <DatabaseHealthCard
+              key={db.id}
+              db={db}
+              authFetch={authFetch}
+              fetchDatasources={fetchDatasources}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="text-center py-12">
+          <DatabaseIcon className="h-12 w-12 text-gray-400 mx-auto" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No datasources</h3>
+          <p className="mt-1 text-sm text-gray-500">Get started by creating a new database connection.</p>
+          <div className="mt-6">
+            <button
+              onClick={() => setShowNewConnection(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus size={20} className="mr-2" />
+              New Connection
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showNewConnection && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h2 className="text-lg font-medium mb-4">Add New Database Connection</h2>
+            <form onSubmit={handleNewConnection} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Database Vendor</label>
+                <select
+                  value={formData.vendor}
+                  onChange={(e) => handleInputChange('vendor', e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                >
+                  <option value="">Select Database Vendor</option>
+                  {DATABASE_VENDORS.map((vendor) => (
+                    <option key={vendor.value} value={vendor.value}>
+                      {vendor.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Connection Name</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="My Database"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Host</label>
+                <input
+                  type="text"
+                  value={formData.database_config.host}
+                  onChange={(e) => handleInputChange('database_config.host', e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="localhost"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Port</label>
+                <input
+                  type="number"
+                  value={formData.database_config.port}
+                  onChange={(e) => handleInputChange('database_config.port', parseInt(e.target.value))}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="3306"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Database Name</label>
+                <input
+                  type="text"
+                  value={formData.database_config.database_name}
+                  onChange={(e) => handleInputChange('database_config.database_name', e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="my_database"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Username</label>
+                <input
+                  type="text"
+                  value={formData.credentials.username}
+                  onChange={(e) => handleInputChange('credentials.username', e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="username"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Password</label>
+                <input
+                  type="password"
+                  value={formData.credentials.password}
+                  onChange={(e) => handleInputChange('credentials.password', e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  placeholder="********"
+                />
+              </div>
+
+              {error && (
+                <div className="text-red-600 text-sm mt-2">
+                  {error}
+                </div>
+              )}
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Connecting...' : 'Add Datasource'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowNewConnection(false)}
+                  className="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default Databases;
