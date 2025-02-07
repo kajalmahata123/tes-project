@@ -1,15 +1,305 @@
-# smart_ql/utils/dependencies.py
-from fastapi import Depends, HTTPException, Security, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from smart_ql.features.auth.core.dependencies import get_auth_service
-from smart_ql.features.auth.models.user import User
-from smart_ql.features.auth.services.auth_service import AuthService
+import React, { useState } from 'react';
+import {
+  LineChart as RechartsLineChart, Line, XAxis, YAxis, CartesianGrid, 
+  Tooltip, Legend, ResponsiveContainer, BarChart, Bar
+} from 'recharts';
+import { ArrowRight } from 'lucide-react';
 
-security = HTTPBearer()
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Security(security),
-    auth_service: AuthService = Depends(get_auth_service)
-) -> User:
-    """Dependency to get current authenticated user"""
-    return await auth_service.get_current_user(credentials.credentials)
+// Types
+interface QueryStructure {
+  type: string;
+  tables: string[];
+}
+
+interface QueryComplexity {
+  level: string;
+  factors: string[];
+}
+
+interface QueryAnalysis {
+  structure: QueryStructure;
+  complexity: QueryComplexity;
+  recommendations: string[];
+}
+
+interface DataSummary {
+  key_findings: string[];
+  patterns: string[];
+}
+
+interface DataRecommendations {
+  analysis: string[];
+}
+
+interface DataAnalysisDetails {
+  summary: DataSummary;
+  recommendations: DataRecommendations;
+}
+
+interface VisualizationConfig {
+  x: string;
+  y: string[];
+}
+
+interface Visualization {
+  type: 'line' | 'bar';
+  title: string;
+  description: string;
+  data: Record<string, any>[];
+  config: VisualizationConfig;
+}
+
+interface DataAnalysis {
+  analysis: DataAnalysisDetails;
+  sample_visualizations: Visualization[];
+}
+
+interface AnalysisResults {
+  generatedSQL: string;
+  query_analysis: QueryAnalysis;
+  data_analysis: DataAnalysis;
+}
+
+const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff8042'];
+
+const QueryEditor: React.FC = () => {
+  const [query, setQuery] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<string>('query');
+  const [analysisResults, setAnalysisResults] = useState<AnalysisResults | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  // Fetch suggested queries from backend
+  useEffect(() => {
+    const fetchSuggestions = async () => {
+      try {
+        const response = await fetch('/api/suggested-queries');
+        if (!response.ok) {
+          throw new Error('Failed to fetch suggestions');
+        }
+        const data = await response.json();
+        setSuggestions(data.suggestions);
+      } catch (err) {
+        console.error('Error fetching suggestions:', err);
+      }
+    };
+
+    fetchSuggestions();
+  }, []);
+
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/analyze-query', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          query_text: query,
+          connection_id: 'default' // You can make this dynamic based on your needs
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Error: ${response.statusText}`);
+      }
+
+      const results: AnalysisResults = await response.json();
+      setAnalysisResults(results);
+      setActiveTab('query');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred while analyzing the query');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto p-4 font-sans">
+      <h1 className="text-2xl mb-2">Natural Language Query</h1>
+      <p className="mb-4 text-gray-600">Ask questions about your data in plain English</p>
+
+      {/* Query Input */}
+      <div className="border border-gray-200 rounded-lg p-4 mb-4">
+        <textarea
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Ask a question about your data..."
+          className="w-full min-h-[60px] p-3 mb-4 border border-gray-200 rounded-lg text-base resize-y"
+        />
+        
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+            {error}
+          </div>
+        )}
+
+        <button
+          onClick={handleSubmit}
+          disabled={isLoading}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg flex items-center gap-2 float-right hover:bg-blue-700 disabled:opacity-50"
+        >
+          {isLoading ? 'Analyzing...' : 'Send'} <ArrowRight size={16} />
+        </button>
+
+        {/* Suggested Queries */}
+        <div className="mb-4">
+          <p className="mb-2 text-gray-600">Suggested Queries</p>
+          <div className="flex gap-2 flex-wrap">
+            {suggestions.map((suggestion, index) => (
+              <button
+                key={index}
+                onClick={() => setQuery(suggestion)}
+                className="px-4 py-2 bg-gray-100 border border-gray-200 rounded-full hover:bg-gray-200"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="clear-both"></div>
+      </div>
+
+      {/* Analysis Results */}
+      {analysisResults && (
+        <div className="border border-gray-200 rounded-lg">
+          {/* Tabs */}
+          <div className="flex border-b border-gray-200 bg-gray-50">
+            {['Query', 'Query Analysis', 'Data Analysis', 'Visualization'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab.toLowerCase().replace(' ', '_'))}
+                className={`px-6 py-3 border-r border-gray-200 ${
+                  activeTab === tab.toLowerCase().replace(' ', '_')
+                    ? 'bg-white font-semibold border-b-0'
+                    : 'hover:bg-gray-100'
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab Content */}
+          <div className="p-4">
+            {activeTab === 'query' && (
+              <div>
+                <h3 className="text-lg font-medium mb-4">Generated SQL</h3>
+                <pre className="bg-gray-50 p-4 rounded-lg overflow-auto mb-6">
+                  <code>{analysisResults.generatedSQL}</code>
+                </pre>
+              </div>
+            )}
+
+            {activeTab === 'query_analysis' && (
+              <div>
+                <h3 className="text-lg font-medium mb-2">Query Structure</h3>
+                <ul className="mb-4">
+                  <li>Type: {analysisResults.query_analysis.structure.type}</li>
+                  <li>Tables: {analysisResults.query_analysis.structure.tables.join(', ')}</li>
+                </ul>
+
+                <h3 className="text-lg font-medium mb-2">Complexity</h3>
+                <p>Level: {analysisResults.query_analysis.complexity.level}</p>
+                <ul className="mb-4">
+                  {analysisResults.query_analysis.complexity.factors.map((factor, index) => (
+                    <li key={index}>{factor}</li>
+                  ))}
+                </ul>
+
+                <h3 className="text-lg font-medium mb-2">Recommendations</h3>
+                <ul>
+                  {analysisResults.query_analysis.recommendations.map((rec, index) => (
+                    <li key={index}>{rec}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {activeTab === 'data_analysis' && (
+              <div>
+                <h3 className="text-lg font-medium mb-2">Key Findings</h3>
+                <ul className="mb-4">
+                  {analysisResults.data_analysis.analysis.summary.key_findings.map((finding, index) => (
+                    <li key={index}>{finding}</li>
+                  ))}
+                </ul>
+
+                <h3 className="text-lg font-medium mb-2">Patterns</h3>
+                <ul className="mb-4">
+                  {analysisResults.data_analysis.analysis.summary.patterns.map((pattern, index) => (
+                    <li key={index}>{pattern}</li>
+                  ))}
+                </ul>
+
+                <h3 className="text-lg font-medium mb-2">Recommendations</h3>
+                <ul>
+                  {analysisResults.data_analysis.analysis.recommendations.analysis.map((rec, index) => (
+                    <li key={index}>{rec}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {activeTab === 'visualization' && (
+              <div>
+                {analysisResults.data_analysis.sample_visualizations.map((viz, index) => (
+                  <div key={index} className="mb-8">
+                    <h3 className="text-lg font-medium">{viz.title}</h3>
+                    <p className="text-gray-600 mb-4">{viz.description}</p>
+                    <div className="h-96">
+                      <ResponsiveContainer width="100%" height="100%">
+                        {viz.type === 'line' ? (
+                          <RechartsLineChart data={viz.data}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey={viz.config.x} />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            {viz.config.y.map((metric, i) => (
+                              <Line
+                                key={metric}
+                                type="monotone"
+                                dataKey={metric}
+                                stroke={COLORS[i % COLORS.length]}
+                              />
+                            ))}
+                          </RechartsLineChart>
+                        ) : (
+                          <BarChart data={viz.data}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey={viz.config.x} />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            {viz.config.y.map((metric, i) => (
+                              <Bar
+                                key={metric}
+                                dataKey={metric}
+                                fill={COLORS[i % COLORS.length]}
+                              />
+                            ))}
+                          </BarChart>
+                        )}
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default QueryEditor;
