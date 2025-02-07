@@ -89,18 +89,18 @@ const QueryEditor: React.FC<QueryEditorProps> = ({ db, fetchDatasources, authFet
     const fetchSuggestions = async () => {
       try {
         const response = await authFetch<{ suggestions: string[] }>('/api/suggested-queries');
-        if (!response.ok) {
-          throw new Error('Failed to fetch suggestions');
+        if (response.error) {
+          throw new Error(response.error);
         }
-        const data = await response.json();
-        setSuggestions(data.suggestions);
+        setSuggestions(response.suggestions);
       } catch (err) {
         console.error('Error fetching suggestions:', err);
+        setSuggestions([]);
       }
     };
 
     fetchSuggestions();
-  }, []);
+  }, [authFetch]);
 
   const [isImportingSchema, setIsImportingSchema] = useState(false);
 
@@ -139,12 +139,11 @@ const QueryEditor: React.FC<QueryEditorProps> = ({ db, fetchDatasources, authFet
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`Error: ${response.statusText}`);
+      if (response.error) {
+        throw new Error(response.error);
       }
 
-      const results: AnalysisResults = await response.json();
-      setAnalysisResults(results);
+      setAnalysisResults(response);
       setActiveTab('query');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred while analyzing the query');
