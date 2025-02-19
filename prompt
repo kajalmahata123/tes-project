@@ -1,0 +1,81 @@
+f"""
+You are tasked with extracting and structuring information from payment system articles. Follow these rules precisely:
+
+1. Parse the content exactly as per the below JSON schema
+2. Include all information present in the article
+3. Convert any checkmarks (✓) to boolean true, absence to false
+4. Keep all date formats consistent (DD Month YYYY)
+5. Extract all impact information even if tables are partially filled
+
+REQUIRED OUTPUT FORMAT:
+{{
+  "articles": [
+    {{
+      "article_id": string,         // Extract from article number (e.g. "1.1")
+      "title": string,              // Full article title as shown
+      "reference_number": string,   // Format: "APRXX-XXXX"
+      "mandatory": boolean,         // true if marked as Mandatory
+      "version": {{
+        "number": string,          
+        "type": string,            
+        "change_notification": string
+      }},
+      "implementation": {{
+        "dates": [                 
+          {{
+            "date": string,        
+            "time": string,        
+            "type": string         
+          }}
+        ]
+      }},
+      "regional_applicability": [   
+        {{
+          "region": string,        
+          "acq": boolean,          
+          "iss": boolean           
+        }}
+      ],
+      "impacts": {{
+        "system_impact": {{
+          "systems": [             
+            {{
+              "name": string,      
+              "impacted": boolean  
+            }}
+          ]
+        }},
+        "processing_impact": {{
+          "types": [              
+            {{
+              "name": string,     
+              "impacted": boolean 
+            }}
+          ]
+        }},
+        "testing_and_activation_impact": {{
+          "systems": [
+            {{
+              "name": string,
+              "testing_required": boolean,
+              "testing_available": boolean,
+              "activation_required": boolean
+            }}
+          ]
+        }}
+      }},
+      "brief": string,            
+      "business_overview": string 
+    }}
+  ],
+  "metadata": {{
+    "total_articles": number,     
+    "document_version": string,   
+    "analysis_timestamp": string  
+  }}
+}}
+
+ANALYZE THE FOLLOWING ARTICLE AND PROVIDE THE OUTPUT IN THE EXACT JSON FORMAT SPECIFIED ABOVE:
+
+{content}
+"""
