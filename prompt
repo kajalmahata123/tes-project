@@ -1,81 +1,83 @@
-f"""
-You are tasked with extracting and structuring information from payment system articles. Follow these rules precisely:
+import os
+import anthropic
+import logging
+from typing import Optional
 
-1. Parse the content exactly as per the below JSON schema
-2. Include all information present in the article
-3. Convert any checkmarks (✓) to boolean true, absence to false
-4. Keep all date formats consistent (DD Month YYYY)
-5. Extract all impact information even if tables are partially filled
+logger = logging.getLogger(__name__)
 
-REQUIRED OUTPUT FORMAT:
-{{
-  "articles": [
-    {{
-      "article_id": string,         // Extract from article number (e.g. "1.1")
-      "title": string,              // Full article title as shown
-      "reference_number": string,   // Format: "APRXX-XXXX"
-      "mandatory": boolean,         // true if marked as Mandatory
-      "version": {{
-        "number": string,          
-        "type": string,            
-        "change_notification": string
-      }},
-      "implementation": {{
-        "dates": [                 
-          {{
-            "date": string,        
-            "time": string,        
-            "type": string         
-          }}
-        ]
-      }},
-      "regional_applicability": [   
-        {{
-          "region": string,        
-          "acq": boolean,          
-          "iss": boolean           
-        }}
-      ],
-      "impacts": {{
-        "system_impact": {{
-          "systems": [             
-            {{
-              "name": string,      
-              "impacted": boolean  
-            }}
-          ]
-        }},
-        "processing_impact": {{
-          "types": [              
-            {{
-              "name": string,     
-              "impacted": boolean 
-            }}
-          ]
-        }},
-        "testing_and_activation_impact": {{
-          "systems": [
-            {{
-              "name": string,
-              "testing_required": boolean,
-              "testing_available": boolean,
-              "activation_required": boolean
-            }}
-          ]
-        }}
-      }},
-      "brief": string,            
-      "business_overview": string 
-    }}
-  ],
-  "metadata": {{
-    "total_articles": number,     
-    "document_version": string,   
-    "analysis_timestamp": string  
-  }}
-}}
+# Initialize Claude client
+claude_key = os.environ.get('ANTHROPIC_API_KEY')
+if not claude_key:
+    raise Exception("ANTHROPIC_API_KEY environment variable must be set")
 
-ANALYZE THE FOLLOWING ARTICLE AND PROVIDE THE OUTPUT IN THE EXACT JSON FORMAT SPECIFIED ABOVE:
+client = anthropic.Client(api_key=claude_key)
 
-{content}
-"""
+def get_llm_response(query: str, context: str, conversation_history: str = "") -> str:
+    """
+    Get response from Claude using query, context, and conversation history
+    """
+    try:
+        logger.info(f"Sending request to Claude with query: {query[:50]}...")
+        
+        # Safety check for inputs
+        if not query.strip() or not context.strip():
+            logger.error("Empty query or context provided")
+            return "I apologize, but I need both a question and context to provide a meaningful response."
+
+        # Construct the prompt with conversation history
+        prompt = f"""You are a knowledgeable assistant helping to answer questions based on provided document context.
+
+Context from the document:
+---
+{context}
+---
+
+{conversation_history}
+
+Question: {query}
+
+Instructions for providing your response:
+1. Focus specifically on information found in the provided context
+2. If the context contains relevant information:
+   - Provide a clear, direct answer
+   - Quote specific parts of the context to support your response
+   - Explain any technical terms if present
+3. If the context doesn't contain relevant information:
+   - Clearly state that the information is not found in the provided context
+   - Do not make assumptions or provide information outside the context
+4. Keep your response concise but informative
+5. Maintain consistency with any previous conversation context
+
+Please provide your response:"""
+
+        # Generate response with safety checks
+        try:
+            response = client.messages.create(
+                model="claude-3-sonnet-20240229",
+                max_tokens=1024,
+                temperature=0,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            
+            if not response or not hasattr(response, 'content'):
+                logger.error("Invalid response format from Claude")
+                return "I apologize, but I couldn't generate a proper response. Please try again."
+                
+            if not response.content:
+                logger.error("Empty response received from Claude")
+                return "I apologize, but I couldn't generate a response at this time. Please try again."
+                
+            logger.info("Successfully received response from Claude")
+            return response.content[0].text.strip()
+
+        except anthropic.APIError as api_error:
+            logger.error(f"Error during Claude API call: {str(api_error)}")
+            if "invalid_api_key" in str(api_error).lower():
+                raise Exception("Invalid API key. Please check your ANTHROPIC_API_KEY environment variable.")
+            return "I encountered an error while processing your request. Please try again or rephrase your question."
+            
+    except Exception as e:
+        logger.error(f"Error getting LLM response: {str(e)}")
+        if "invalid_api_key" in str(e).lower():
+            raise Exception("Invalid API key. Please check your ANTHROPIC_API_KEY environment variable.")
+        raise Exception(f"Failed to get LLM response: {str(e)}")
