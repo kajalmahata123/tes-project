@@ -17,95 +17,95 @@ class VisaChatHandler:
 
     def _build_system_prompt(self) -> str:
         """Build system prompt for VISA technical assistant."""
-        return """You are a specialized technical assistant for VISA payment network documentation and ISO 8583 message processing. Your expertise includes:
+        return """You are a specialized technical assistant for VISA payment network documentation and ISO 8583 message processing.
 
+Key Technical Areas:
 1. ISO 8583 Message Standards
-   - Message types and formats
+   - Message types and structures
    - Field specifications
-   - Mandatory and optional fields
    - Data element formats
    - Validation rules
 
 2. VISA Network Processing
    - Transaction flows
-   - Authorization processing
-   - Financial messages
-   - Reversals and adjustments
-   - Network management
-
-3. Technical Specifications
-   - Message structures
-   - Field requirements
-   - Processing codes
-   - Response codes
-   - Security requirements
-
-4. Implementation Requirements
-   - Integration guidelines
-   - Testing procedures
-   - Certification requirements
-   - Error handling
+   - Message requirements
+   - Network protocols
    - Security standards
 
-When responding to queries:
-- Focus on technical accuracy
-- Reference specific field numbers and codes
-- Explain message flows and dependencies
-- Highlight mandatory requirements
-- Note any conditional rules
-- Include relevant security considerations
+Response Requirements:
+1. Write direct, professional responses
+2. Start immediately with technical content
+3. Never use phrases like:
+   - "Based on the documentation..."
+   - "I will focus on..."
+   - "Let me explain..."
+   - "I'll help you understand..."
+   - "According to the documentation..."
+   
+4. Structure responses with:
+   - Technical specifications first
+   - Field requirements and formats
+   - Processing rules and conditions
+   - Implementation requirements
 
-Maintain a professional, technical tone while making complex information accessible."""
+5. Always include:
+   - Specific field numbers
+   - Message type indicators
+   - Format specifications
+   - Required values
+
+Formatting:
+1. Use clear hierarchical structure
+2. Include relevant codes and values
+3. Specify exact requirements
+4. Note mandatory vs optional elements"""
 
     def _build_analysis_prompt(self, query: str, context: str) -> str:
         """Build specialized prompt for VISA documentation analysis."""
-        return f"""Here is the technical documentation context to analyze:
-
-Context from VISA Documentation:
+        return f"""Technical Documentation Context:
 ---
 {context}
 ---
 
 Technical Query: {query}
 
-Please analyze the documentation and provide a detailed technical response following these guidelines:
+Required Response Format:
 
-1. Message Analysis (if applicable):
-   - Identify message type (MTI)
-   - List required fields
-   - Specify format requirements
-   - Note processing conditions
-   - Explain field dependencies
+1. Technical Specifications
+   - MTI and message formats
+   - Field numbers and requirements
+   - Data formats and lengths
+   - Processing conditions
 
-2. Field Analysis (if applicable):
-   - Provide field specifications
-   - Detail format requirements
-   - Explain validation rules
-   - Note usage conditions
-   - Highlight restrictions
+2. Implementation Requirements
+   - Validation rules
+   - Processing steps
+   - Security requirements
+   - Error handling
 
-3. Processing Requirements:
-   - Outline processing steps
-   - Specify timing requirements
-   - List validation checks
-   - Note security requirements
-   - Explain error handling
+3. Format Guidelines
+   - Start with direct technical content
+   - Use field numbers and codes
+   - Include exact specifications
+   - Note all dependencies
 
-4. Implementation Guidance:
-   - Provide technical details
-   - Note integration requirements
-   - Highlight critical considerations
-   - Reference relevant standards
-   - Include testing guidance
+4. Response Sections:
+   Message Requirements:
+   - List exact fields
+   - Specify formats
+   - Note conditions
 
-5. Response Structure:
-   - Start with direct answer
-   - Support with specifications
-   - Include field references
-   - Quote relevant documentation
-   - Add technical explanations
+   Processing Rules:
+   - Detail steps
+   - List validations
+   - Specify timing
 
-Please provide a comprehensive technical response:"""
+   Technical Notes:
+   - Implementation details
+   - Security requirements
+   - Error handling
+
+Provide technical response:"""
 
     async def handle_chat_query(self,
                               query: str,
@@ -125,19 +125,12 @@ Please provide a comprehensive technical response:"""
         try:
             logger.info(f"Processing technical query: {query[:50]}...")
 
-            # Input validation
-            if not query.strip():
+            if not query.strip() or not context.strip():
                 return {
-                    "error": "Query cannot be empty",
-                    "response": None
-                }
-            if not context.strip():
-                return {
-                    "error": "Context cannot be empty",
+                    "error": "Query and context required",
                     "response": None
                 }
 
-            # Build messages
             messages = [
                 {
                     "role": "system",
@@ -145,21 +138,18 @@ Please provide a comprehensive technical response:"""
                 }
             ]
 
-            # Add conversation history if provided
             if conversation_history:
                 messages.append({
                     "role": "assistant",
                     "content": conversation_history
                 })
 
-            # Add current query with analysis prompt
             messages.append({
                 "role": "user",
                 "content": self._build_analysis_prompt(query, context)
             })
 
             try:
-                # Get response from Claude
                 response = self.client.messages.create(
                     model="claude-3-sonnet-20240229",
                     max_tokens=1024,
@@ -169,7 +159,7 @@ Please provide a comprehensive technical response:"""
 
                 if not response or not response.content:
                     return {
-                        "error": "Failed to generate response",
+                        "error": "Response generation failed",
                         "response": None
                     }
 
@@ -178,22 +168,21 @@ Please provide a comprehensive technical response:"""
                     "response": response.content[0].text.strip(),
                     "metadata": {
                         "timestamp": datetime.now().isoformat(),
-                        "query_type": self._classify_query_type(query),
-                        "context_length": len(context)
+                        "query_type": self._classify_query_type(query)
                     }
                 }
 
             except anthropic.APIError as api_error:
                 logger.error(f"API Error: {str(api_error)}")
                 return {
-                    "error": f"API Error: {str(api_error)}",
+                    "error": str(api_error),
                     "response": None
                 }
 
         except Exception as e:
-            logger.error(f"Error handling query: {str(e)}")
+            logger.error(f"Error: {str(e)}")
             return {
-                "error": f"Internal error: {str(e)}",
+                "error": str(e),
                 "response": None
             }
 
@@ -207,35 +196,31 @@ Please provide a comprehensive technical response:"""
             return "message_format"
         elif any(term in query_lower for term in ["process", "flow", "transaction"]):
             return "processing_flow"
-        elif any(term in query_lower for term in ["security", "encrypt", "authenticate"]):
+        elif any(term in query_lower for term in ["security", "encrypt"]):
             return "security_requirement"
-        elif any(term in query_lower for term in ["error", "response code", "decline"]):
+        elif any(term in query_lower for term in ["error", "response code"]):
             return "error_handling"
-        elif any(term in query_lower for term in ["implement", "integrate", "test"]):
-            return "implementation"
         else:
             return "general_technical"
 
 # Usage example:
 """
 async def main():
-    # Initialize chat handler
     handler = VisaChatHandler()
     
-    # Example query about ISO field
+    # Example: Field specification query
     response = await handler.handle_chat_query(
-        query="What are the specifications for ISO field 39 (Response Code)?",
-        context="Field 39 (Response Code) is a 2-character alphanumeric field..."
+        query="What are the requirements for Field 39 (Response Code)?",
+        context="Field 39: Response Code specifications..."
     )
-    print("Response:", json.dumps(response, indent=2))
+    print(response["response"])
     
-    # Example query about message flow
+    # Example: Message flow query
     response = await handler.handle_chat_query(
-        query="Explain the authorization message flow for a purchase transaction",
-        context="Authorization flow begins with a 0100 message containing fields...",
-        conversation_history="Previous discussion about authorization..."
+        query="Describe purchase authorization message requirements",
+        context="Authorization messages require the following fields..."
     )
-    print("Response:", json.dumps(response, indent=2))
+    print(response["response"])
 
 if __name__ == "__main__":
     import asyncio
