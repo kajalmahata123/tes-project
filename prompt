@@ -1,83 +1,243 @@
 import os
 import anthropic
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any
+from datetime import datetime
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize Claude client
-claude_key = os.environ.get('ANTHROPIC_API_KEY')
-if not claude_key:
-    raise Exception("ANTHROPIC_API_KEY environment variable must be set")
+class VisaChatHandler:
+    def __init__(self, api_key: Optional[str] = None):
+        """Initialize chat handler with API key."""
+        self.api_key = api_key or os.environ.get('ANTHROPIC_API_KEY')
+        if not self.api_key:
+            raise ValueError("ANTHROPIC_API_KEY environment variable must be set")
+        self.client = anthropic.Client(api_key=self.api_key)
 
-client = anthropic.Client(api_key=claude_key)
+    def _build_system_prompt(self) -> str:
+        """Build system prompt for VISA technical assistant."""
+        return """You are a specialized technical assistant for VISA payment network documentation and ISO 8583 message processing. Your expertise includes:
 
-def get_llm_response(query: str, context: str, conversation_history: str = "") -> str:
-    """
-    Get response from Claude using query, context, and conversation history
-    """
-    try:
-        logger.info(f"Sending request to Claude with query: {query[:50]}...")
-        
-        # Safety check for inputs
-        if not query.strip() or not context.strip():
-            logger.error("Empty query or context provided")
-            return "I apologize, but I need both a question and context to provide a meaningful response."
+1. ISO 8583 Message Standards
+   - Message types and formats
+   - Field specifications
+   - Mandatory and optional fields
+   - Data element formats
+   - Validation rules
 
-        # Construct the prompt with conversation history
-        prompt = f"""You are a knowledgeable assistant helping to answer questions based on provided document context.
+2. VISA Network Processing
+   - Transaction flows
+   - Authorization processing
+   - Financial messages
+   - Reversals and adjustments
+   - Network management
 
-Context from the document:
+3. Technical Specifications
+   - Message structures
+   - Field requirements
+   - Processing codes
+   - Response codes
+   - Security requirements
+
+4. Implementation Requirements
+   - Integration guidelines
+   - Testing procedures
+   - Certification requirements
+   - Error handling
+   - Security standards
+
+When responding to queries:
+- Focus on technical accuracy
+- Reference specific field numbers and codes
+- Explain message flows and dependencies
+- Highlight mandatory requirements
+- Note any conditional rules
+- Include relevant security considerations
+
+Maintain a professional, technical tone while making complex information accessible."""
+
+    def _build_analysis_prompt(self, query: str, context: str) -> str:
+        """Build specialized prompt for VISA documentation analysis."""
+        return f"""Here is the technical documentation context to analyze:
+
+Context from VISA Documentation:
 ---
 {context}
 ---
 
-{conversation_history}
+Technical Query: {query}
 
-Question: {query}
+Please analyze the documentation and provide a detailed technical response following these guidelines:
 
-Instructions for providing your response:
-1. Focus specifically on information found in the provided context
-2. If the context contains relevant information:
-   - Provide a clear, direct answer
-   - Quote specific parts of the context to support your response
-   - Explain any technical terms if present
-3. If the context doesn't contain relevant information:
-   - Clearly state that the information is not found in the provided context
-   - Do not make assumptions or provide information outside the context
-4. Keep your response concise but informative
-5. Maintain consistency with any previous conversation context
+1. Message Analysis (if applicable):
+   - Identify message type (MTI)
+   - List required fields
+   - Specify format requirements
+   - Note processing conditions
+   - Explain field dependencies
 
-Please provide your response:"""
+2. Field Analysis (if applicable):
+   - Provide field specifications
+   - Detail format requirements
+   - Explain validation rules
+   - Note usage conditions
+   - Highlight restrictions
 
-        # Generate response with safety checks
+3. Processing Requirements:
+   - Outline processing steps
+   - Specify timing requirements
+   - List validation checks
+   - Note security requirements
+   - Explain error handling
+
+4. Implementation Guidance:
+   - Provide technical details
+   - Note integration requirements
+   - Highlight critical considerations
+   - Reference relevant standards
+   - Include testing guidance
+
+5. Response Structure:
+   - Start with direct answer
+   - Support with specifications
+   - Include field references
+   - Quote relevant documentation
+   - Add technical explanations
+
+Please provide a comprehensive technical response:"""
+
+    async def handle_chat_query(self,
+                              query: str,
+                              context: str,
+                              conversation_history: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Handle chat query with VISA technical documentation context.
+        
+        Args:
+            query: User's technical query
+            context: Relevant documentation context
+            conversation_history: Optional conversation history
+            
+        Returns:
+            Dict containing response and metadata
+        """
         try:
-            response = client.messages.create(
-                model="claude-3-sonnet-20240229",
-                max_tokens=1024,
-                temperature=0,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            
-            if not response or not hasattr(response, 'content'):
-                logger.error("Invalid response format from Claude")
-                return "I apologize, but I couldn't generate a proper response. Please try again."
-                
-            if not response.content:
-                logger.error("Empty response received from Claude")
-                return "I apologize, but I couldn't generate a response at this time. Please try again."
-                
-            logger.info("Successfully received response from Claude")
-            return response.content[0].text.strip()
+            logger.info(f"Processing technical query: {query[:50]}...")
 
-        except anthropic.APIError as api_error:
-            logger.error(f"Error during Claude API call: {str(api_error)}")
-            if "invalid_api_key" in str(api_error).lower():
-                raise Exception("Invalid API key. Please check your ANTHROPIC_API_KEY environment variable.")
-            return "I encountered an error while processing your request. Please try again or rephrase your question."
-            
-    except Exception as e:
-        logger.error(f"Error getting LLM response: {str(e)}")
-        if "invalid_api_key" in str(e).lower():
-            raise Exception("Invalid API key. Please check your ANTHROPIC_API_KEY environment variable.")
-        raise Exception(f"Failed to get LLM response: {str(e)}")
+            # Input validation
+            if not query.strip():
+                return {
+                    "error": "Query cannot be empty",
+                    "response": None
+                }
+            if not context.strip():
+                return {
+                    "error": "Context cannot be empty",
+                    "response": None
+                }
+
+            # Build messages
+            messages = [
+                {
+                    "role": "system",
+                    "content": self._build_system_prompt()
+                }
+            ]
+
+            # Add conversation history if provided
+            if conversation_history:
+                messages.append({
+                    "role": "assistant",
+                    "content": conversation_history
+                })
+
+            # Add current query with analysis prompt
+            messages.append({
+                "role": "user",
+                "content": self._build_analysis_prompt(query, context)
+            })
+
+            try:
+                # Get response from Claude
+                response = self.client.messages.create(
+                    model="claude-3-sonnet-20240229",
+                    max_tokens=1024,
+                    temperature=0,
+                    messages=messages
+                )
+
+                if not response or not response.content:
+                    return {
+                        "error": "Failed to generate response",
+                        "response": None
+                    }
+
+                return {
+                    "error": None,
+                    "response": response.content[0].text.strip(),
+                    "metadata": {
+                        "timestamp": datetime.now().isoformat(),
+                        "query_type": self._classify_query_type(query),
+                        "context_length": len(context)
+                    }
+                }
+
+            except anthropic.APIError as api_error:
+                logger.error(f"API Error: {str(api_error)}")
+                return {
+                    "error": f"API Error: {str(api_error)}",
+                    "response": None
+                }
+
+        except Exception as e:
+            logger.error(f"Error handling query: {str(e)}")
+            return {
+                "error": f"Internal error: {str(e)}",
+                "response": None
+            }
+
+    def _classify_query_type(self, query: str) -> str:
+        """Classify the type of technical query."""
+        query_lower = query.lower()
+        
+        if any(term in query_lower for term in ["field", "de", "data element"]):
+            return "field_specification"
+        elif any(term in query_lower for term in ["message", "mti", "format"]):
+            return "message_format"
+        elif any(term in query_lower for term in ["process", "flow", "transaction"]):
+            return "processing_flow"
+        elif any(term in query_lower for term in ["security", "encrypt", "authenticate"]):
+            return "security_requirement"
+        elif any(term in query_lower for term in ["error", "response code", "decline"]):
+            return "error_handling"
+        elif any(term in query_lower for term in ["implement", "integrate", "test"]):
+            return "implementation"
+        else:
+            return "general_technical"
+
+# Usage example:
+"""
+async def main():
+    # Initialize chat handler
+    handler = VisaChatHandler()
+    
+    # Example query about ISO field
+    response = await handler.handle_chat_query(
+        query="What are the specifications for ISO field 39 (Response Code)?",
+        context="Field 39 (Response Code) is a 2-character alphanumeric field..."
+    )
+    print("Response:", json.dumps(response, indent=2))
+    
+    # Example query about message flow
+    response = await handler.handle_chat_query(
+        query="Explain the authorization message flow for a purchase transaction",
+        context="Authorization flow begins with a 0100 message containing fields...",
+        conversation_history="Previous discussion about authorization..."
+    )
+    print("Response:", json.dumps(response, indent=2))
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
+"""
