@@ -1,151 +1,709 @@
-from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Dict
-from app.models.schemas import (
-    CheckoutAnalysisResponse,
-    TransactionInfo,
-    Card,
-    CardBenefits
-)
-from app.utils.sample_data import get_sample_data
-from app.services.analyzer import CardAnalyzerService
-from app.config import get_settings
+import os
+import uuid
+import logging
+import json
+from typing import Dict, Any, List, Optional, Tuple
 
-router = APIRouter()
+from langchain.schema import Document
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_anthropic import ChatAnthropic
 
-# Dependency to get analyzer service
-async def get_analyzer() -> CardAnalyzerService:
-    settings = get_settings()
-    return CardAnalyzerService(api_key=settings.ANTHROPIC_API_KEY)
+from app.services.pdf_parser import PDFParser
+from app.services.openapi_parser import OpenAPIParser
+from app.services.chroma_service import ChromaService
 
-@router.get("/checkout-analysis", response_model=CheckoutAnalysisResponse)
-async def get_checkout_analysis(analyzer: CardAnalyzerService = Depends(get_analyzer)):
-    """
-    Get checkout analysis data including available cards and their benefits
-    """
-    try:
-        # Get sample data
-        data = get_sample_data()
-        
-        # Get analysis from Claude
-        analysis = await analyzer.analyze_checkout_options(
-            transaction=data["transaction"],
-            available_cards=data["cards"]
-        )
-        
-        # Combine sample data with analysis
-        response_data = {
-            "transaction": data["transaction"],
-            "cards": data["cards"],
-            "analysis": analysis
-        }
-        
-        return CheckoutAnalysisResponse(**response_data)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+logger = logging.getLogger(__name__)
 
-@router.post("/analyze-transaction")
-async def analyze_transaction(
-    transaction: TransactionInfo,
-    analyzer: CardAnalyzerService = Depends(get_analyzer)
-):
-    """
-    Analyze a specific transaction and return recommended cards
-    """
-    try:
-        # Get available cards (in real app, would come from user's profile)
-        data = get_sample_data()
-        available_cards = data["cards"]
-        
-        # Get analysis from Claude
-        analysis = await analyzer.analyze_checkout_options(
-            transaction=transaction.dict(),
-            available_cards=available_cards
-        )
-        
-        return {
-            "transaction": transaction,
-            "available_cards": available_cards,
-            "analysis": analysis
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
-@router.get("/cards/{card_id}/analysis")
-async def get_card_analysis(
-    card_id: str,
-    analyzer: CardAnalyzerService = Depends(get_analyzer)
-):
-    """
-    Get detailed analysis for a specific card
-    """
-    try:
-        # Get card data
-        data = get_sample_data()
-        card = next((card for card in data["cards"] if card["id"] == card_id), None)
-        if not card:
-            raise HTTPException(status_code=404, detail="Card not found")
-            
-        # Get transaction data (in real app, might be current cart or recent transaction)
-        transaction = data["transaction"]
-        
-        # Get comprehensive analysis
-        benefits_analysis = await analyzer.analyze_benefits_value(
-            transaction=transaction,
-            card=card
-        )
-        
-        payment_analysis = await analyzer.analyze_payment_scenarios(
-            transaction=transaction,
-            card=card
-        )
-        
-        return {
-            "card": card,
-            "benefits_analysis": benefits_analysis,
-            "payment_analysis": payment_analysis
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+class DocumentProcessorAgent:
+    """Enhanced agent for processing documents and extracting structured information for semantic search"""
 
-@router.post("/cards/{card_id}/set-default")
-async def set_default_card(card_id: str):
-    """
-    Set a card as the default payment method
-    """
-    try:
-        # In real app, would update user's profile in database
-        return {"message": f"Card {card_id} set as default"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    def __init__(
+            self,
+            llm: ChatAnthropic,
+            chroma_service: ChromaService,
+            document_dir: str,
+            chunk_size: int = 1000,
+            chunk_overlap: int = 200
+    ):
+        self.llm = llm
+        self.chroma_service = chroma_service
+        self.document_dir = document_dir
+        self.pdf_parser = PDFParser()
+        self.openapi_parser = OpenAPIParser()
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
 
-@router.get("/cards/{card_id}/benefits", response_model=CardBenefits)
-async def get_card_benefits(
-    card_id: str,
-    analyzer: CardAnalyzerService = Depends(get_analyzer)
-):
-    """
-    Get detailed benefits for a specific card
-    """
-    try:
-        data = get_sample_data()
-        card = next((card for card in data["cards"] if card["id"] == card_id), None)
-        if not card:
-            raise HTTPException(status_code=404, detail="Card not found")
-            
-        transaction = data["transaction"]
-        
-        # Get detailed benefits analysis
-        benefits_analysis = await analyzer.analyze_benefits_value(
-            transaction=transaction,
-            card=card
-        )
-        
-        # Combine actual benefits data with analysis
-        response = {
-            **card["benefits"],
-            "analysis": benefits_analysis
-        }
-        
-        return response
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Ensure document directory exists
+        os.makedirs(document_dir, exist_ok=True)
+
+    async def process_pdf(
+            self,
+            file_path: str,
+            add_to_vector_db: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Process a PDF document with enhanced semantic chunking
+
+        Args:
+            file_path: Path to PDF file
+            add_to_vector_db: Whether to add to vector database
+
+        Returns:
+            Dictionary with processing results
+        """
+        logger.info(f"Processing PDF document: {file_path}")
+
+        try:
+            # Parse PDF
+            pdf_data = self.pdf_parser.parse_pdf(file_path)
+
+            # Extract API information from chunks
+            api_info = self.pdf_parser.extract_api_information(pdf_data["chunks"])
+
+            # Enhance API information with Claude
+            enhanced_api_info = await self._enhance_api_info(api_info, pdf_data["chunks"])
+
+            result = {
+                "document_id": str(uuid.uuid4()),
+                "document_type": "pdf",
+                "document_name": pdf_data["metadata"]["title"],
+                "metadata": pdf_data["metadata"],
+                "toc": pdf_data["toc"],
+                "chunks_count": len(pdf_data["chunks"]),
+                "api_info": enhanced_api_info,
+                "vector_db_added": False
+            }
+
+            # Add to vector database if requested
+            if add_to_vector_db:
+                vector_docs = []
+
+                # Add semantically enriched chunks to vector documents
+                for chunk in pdf_data["chunks"]:
+                    # Enrich chunk with semantic context
+                    enriched_chunk = await self._enrich_chunk_with_context(
+                        chunk["text"],
+                        pdf_data["metadata"]["title"]
+                    )
+
+                    vector_docs.append({
+                        "text": enriched_chunk,
+                        "metadata": {
+                            "document_id": result["document_id"],
+                            "document_name": pdf_data["metadata"]["title"],
+                            "chunk_index": chunk["chunk_index"],
+                            "document_type": "pdf",
+                            "page": self._extract_page_from_chunk(chunk["text"]),
+                            "section": self._extract_section_from_chunk(chunk["text"], pdf_data["toc"])
+                        }
+                    })
+
+                # Add semantically enhanced API info to vector documents
+                for api in enhanced_api_info:
+                    api_text = await self._create_semantic_api_representation(api)
+
+                    vector_docs.append({
+                        "text": api_text,
+                        "metadata": {
+                            "document_id": result["document_id"],
+                            "document_name": pdf_data["metadata"]["title"],
+                            "document_type": "pdf_api",
+                            "api_method": api["method"],
+                            "api_path": api["path"]
+                        }
+                    })
+
+                # Add to vector DB
+                texts = [doc["text"] for doc in vector_docs]
+                metadatas = [doc["metadata"] for doc in vector_docs]
+
+                self.chroma_service.add_documents(
+                    documents=texts,
+                    metadatas=metadatas
+                )
+
+                result["vector_db_added"] = True
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error processing PDF document: {str(e)}")
+            raise
+
+    async def process_openapi(
+            self,
+            file_path: str,
+            add_to_vector_db: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Process an OpenAPI specification file with semantic enhancements
+
+        Args:
+            file_path: Path to OpenAPI file
+            add_to_vector_db: Whether to add to vector database
+
+        Returns:
+            Dictionary with processing results
+        """
+        logger.info(f"Processing OpenAPI document: {file_path}")
+
+        try:
+            # Parse OpenAPI spec
+            spec = self.openapi_parser.parse_spec(file_path)
+
+            # Extract endpoints
+            endpoints = self.openapi_parser.extract_endpoints(spec)
+
+            # Enhance endpoints with semantically rich descriptions
+            enhanced_endpoints = await self._enhance_openapi_endpoints(endpoints, spec)
+
+            result = {
+                "document_id": str(uuid.uuid4()),
+                "document_type": "openapi",
+                "document_name": spec["info"].get("title", os.path.basename(file_path)),
+                "metadata": {
+                    "title": spec["info"].get("title", ""),
+                    "version": spec["info"].get("version", ""),
+                    "description": spec["info"].get("description", ""),
+                    "file_name": os.path.basename(file_path),
+                    "file_path": file_path
+                },
+                "endpoints_count": len(enhanced_endpoints),
+                "endpoints": enhanced_endpoints,
+                "vector_db_added": False
+            }
+
+            # Add to vector database if requested
+            if add_to_vector_db:
+                # Create semantically rich vector documents for better retrieval
+                vector_docs = await self._create_semantic_openapi_vectors(spec, enhanced_endpoints)
+
+                # Add document ID to metadata
+                for doc in vector_docs:
+                    doc["metadata"]["document_id"] = result["document_id"]
+                    doc["metadata"]["document_name"] = result["document_name"]
+
+                # Add to vector DB - use the helper method to clean metadata
+                texts = [doc["text"] for doc in vector_docs]
+                metadatas = [self._prepare_metadata_for_chroma(doc["metadata"]) for doc in vector_docs]
+
+                self.chroma_service.add_documents(
+                    documents=texts,
+                    metadatas=metadatas
+                )
+
+                result["vector_db_added"] = True
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Error processing OpenAPI document: {str(e)}")
+            raise
+
+    async def _enhance_openapi_endpoints(
+            self,
+            endpoints: List[Dict[str, Any]],
+            spec: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        Enhance OpenAPI endpoints with semantically rich descriptions
+        """
+        enhanced_endpoints = []
+
+        for endpoint in endpoints:
+            try:
+                # Create a prompt for Claude to enhance the endpoint description
+                prompt = f"""
+                I need to create a semantically rich description for an API endpoint from an OpenAPI specification.
+
+                Endpoint: {endpoint['method']} {endpoint['path']}
+                Current description: {endpoint.get('description', 'No description available')}
+                Summary: {endpoint.get('summary', 'No summary available')}
+                Parameters: {json.dumps(endpoint.get('parameters', []))}
+                Request body: {json.dumps(endpoint.get('requestBody', {}), default=str)}
+                Responses: {json.dumps(endpoint.get('responses', {}), default=str)}
+
+                Please provide:
+                1. A comprehensive description that includes the purpose, use cases, and functional context
+                2. A list of semantically relevant terms or phrases that might be used in searches for this endpoint
+                3. A summary of the request and response formats in plain language
+
+                Format your response as a JSON object with these keys: enhanced_description, search_terms, request_response_summary
+                """
+
+                messages = [
+                    SystemMessage(
+                        content="You are a helpful assistant that enhances API documentation for semantic search."),
+                    HumanMessage(content=prompt)
+                ]
+
+                response = await self.llm.ainvoke(messages)
+                enhanced_data = self._extract_json_from_response(response.content)
+
+                # Create enhanced endpoint
+                enhanced_endpoint = endpoint.copy()
+                enhanced_endpoint["enhanced_description"] = enhanced_data.get("enhanced_description",
+                                                                              endpoint.get("description", ""))
+                enhanced_endpoint["search_terms"] = enhanced_data.get("search_terms", [])
+                enhanced_endpoint["request_response_summary"] = enhanced_data.get("request_response_summary", "")
+
+                enhanced_endpoints.append(enhanced_endpoint)
+
+            except Exception as e:
+                logger.error(f"Error enhancing endpoint {endpoint.get('path')}: {str(e)}")
+                enhanced_endpoints.append(endpoint)  # Use original if enhancement fails
+
+        return enhanced_endpoints
+
+    async def _create_semantic_openapi_vectors(
+            self,
+            spec: Dict[str, Any],
+            endpoints: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """
+        Create semantically rich vector documents from OpenAPI spec
+        """
+        vector_docs = []
+
+        # Add general API information
+        api_info_text = f"""
+        API: {spec['info'].get('title', 'Untitled API')}
+        Version: {spec['info'].get('version', 'Unknown')}
+        Description: {spec['info'].get('description', 'No description available')}
+
+        This document contains general information about the API.
+        """
+
+        vector_docs.append({
+            "text": api_info_text,
+            "metadata": {
+                "document_type": "openapi_info",
+                "content_type": "api_overview"
+            }
+        })
+
+        # Add enhanced endpoint documents
+        for endpoint in endpoints:
+            # Create a comprehensive document for the endpoint
+            endpoint_text = f"""
+            API Endpoint: {endpoint['method']} {endpoint['path']}
+
+            {endpoint.get('enhanced_description', endpoint.get('description', 'No description available'))}
+
+            Summary: {endpoint.get('summary', 'No summary available')}
+
+            Request/Response Information: {endpoint.get('request_response_summary', '')}
+
+            Parameters: {self._format_parameters_for_vector(endpoint.get('parameters', []))}
+
+            Related search terms: {', '.join(endpoint.get('search_terms', []))}
+            """
+
+            vector_docs.append({
+                "text": endpoint_text,
+                "metadata": {
+                    "document_type": "openapi_endpoint",
+                    "content_type": "endpoint_description",
+                    "method": endpoint["method"],
+                    "path": endpoint["path"],
+                    "tags": endpoint.get("tags", []),
+                    "search_terms": endpoint.get("search_terms", [])
+                }
+            })
+
+            # Create separate documents for request bodies and responses for more targeted retrieval
+            if "requestBody" in endpoint and endpoint["requestBody"]:
+                request_body_text = f"""
+                API Endpoint Request Body: {endpoint['method']} {endpoint['path']}
+
+                This document describes the request body format for the endpoint.
+
+                {self._format_request_body_for_vector(endpoint["requestBody"])}
+                """
+
+                vector_docs.append({
+                    "text": request_body_text,
+                    "metadata": {
+                        "document_type": "openapi_endpoint_request",
+                        "content_type": "request_body",
+                        "method": endpoint["method"],
+                        "path": endpoint["path"]
+                    }
+                })
+
+            if "responses" in endpoint and endpoint["responses"]:
+                for status_code, response_info in endpoint["responses"].items():
+                    response_text = f"""
+                    API Endpoint Response ({status_code}): {endpoint['method']} {endpoint['path']}
+
+                    This document describes the response format for status code {status_code}.
+
+                    {self._format_response_for_vector(status_code, response_info)}
+                    """
+
+                    vector_docs.append({
+                        "text": response_text,
+                        "metadata": {
+                            "document_type": "openapi_endpoint_response",
+                            "content_type": "response",
+                            "method": endpoint["method"],
+                            "path": endpoint["path"],
+                            "status_code": status_code
+                        }
+                    })
+
+            # Create separate documents for each schema object referenced
+            if "schemas" in spec.get("components", {}):
+                for schema_name, schema in spec["components"]["schemas"].items():
+                    schema_text = f"""
+                    API Schema: {schema_name}
+
+                    This document describes the schema object "{schema_name}" used in the API.
+
+                    {self._format_schema_for_vector(schema_name, schema)}
+                    """
+
+                    vector_docs.append({
+                        "text": schema_text,
+                        "metadata": {
+                            "document_type": "openapi_schema",
+                            "content_type": "schema",
+                            "schema_name": schema_name
+                        }
+                    })
+
+        return vector_docs
+
+    def _format_parameters_for_vector(self, parameters: List[Dict[str, Any]]) -> str:
+        """Format parameters for vector storage"""
+        if not parameters:
+            return "No parameters required."
+
+        param_texts = []
+        for param in parameters:
+            required = "Required" if param.get("required", False) else "Optional"
+            param_text = f"- {param.get('name', 'Unnamed')}: {param.get('description', 'No description')} ({required}, in {param.get('in', 'unknown')})"
+            param_texts.append(param_text)
+
+        return "\n".join(param_texts)
+
+    def _format_request_body_for_vector(self, request_body: Dict[str, Any]) -> str:
+        """Format request body for vector storage"""
+        description = request_body.get("description", "No description available")
+        required = "Required" if request_body.get("required", False) else "Optional"
+
+        content_types = []
+        for content_type, content_info in request_body.get("content", {}).items():
+            content_types.append(f"Content type: {content_type}")
+
+            schema = content_info.get("schema", {})
+            if "properties" in schema:
+                content_types.append("Properties:")
+                for prop_name, prop_details in schema["properties"].items():
+                    prop_desc = prop_details.get("description", "No description")
+                    prop_type = prop_details.get("type", "unknown type")
+                    content_types.append(f"  - {prop_name}: {prop_desc} ({prop_type})")
+
+            example = content_info.get("example", {})
+            if example:
+                content_types.append(f"Example: {json.dumps(example, indent=2)}")
+
+        return f"{description} ({required})\n\n" + "\n".join(content_types)
+
+    def _format_response_for_vector(self, status_code: str, response_info: Dict[str, Any]) -> str:
+        """Format response for vector storage"""
+        description = response_info.get("description", "No description available")
+
+        content_types = []
+        for content_type, content_info in response_info.get("content", {}).items():
+            content_types.append(f"Content type: {content_type}")
+
+            schema = content_info.get("schema", {})
+            if schema:
+                if "properties" in schema:
+                    content_types.append("Properties:")
+                    for prop_name, prop_details in schema["properties"].items():
+                        prop_desc = prop_details.get("description", "No description")
+                        prop_type = prop_details.get("type", "unknown type")
+                        content_types.append(f"  - {prop_name}: {prop_desc} ({prop_type})")
+                elif "$ref" in schema:
+                    content_types.append(f"References schema: {schema['$ref']}")
+
+            example = content_info.get("example", {})
+            if example:
+                example_str = json.dumps(example, indent=2)
+                content_types.append(f"Example: {example_str}")
+
+        return f"Status code {status_code}: {description}\n\n" + "\n".join(content_types)
+
+    def _format_schema_for_vector(self, schema_name: str, schema: Dict[str, Any]) -> str:
+        """Format schema for vector storage"""
+        description = schema.get("description", "No description available")
+        schema_type = schema.get("type", "object")
+
+        properties_text = []
+        if "properties" in schema:
+            properties_text.append("Properties:")
+            for prop_name, prop_details in schema["properties"].items():
+                prop_desc = prop_details.get("description", "No description")
+                prop_type = prop_details.get("type", "unknown type")
+                required = "Required" if prop_name in schema.get("required", []) else "Optional"
+                properties_text.append(f"  - {prop_name}: {prop_desc} ({prop_type}, {required})")
+
+        return f"Schema: {schema_name}\nType: {schema_type}\nDescription: {description}\n\n" + "\n".join(
+            properties_text)
+
+    async def _enrich_chunk_with_context(
+            self,
+            chunk_text: str,
+            document_title: str
+    ) -> str:
+        """
+        Enrich a text chunk with semantic context for better retrieval
+        """
+        try:
+            # For very small chunks, just return as is
+            if len(chunk_text) < 100:
+                return chunk_text
+
+            # Create prompt for Claude to add context
+            prompt = f"""
+            I have a chunk of text from a document titled "{document_title}".
+            Please help me enhance this text for semantic search by:
+
+            1. Identifying key concepts and terminology
+            2. Adding relevant synonyms or related terms in [brackets]
+            3. Highlighting important information with a brief summary at the beginning
+
+            Here is the text chunk:
+
+            {chunk_text}
+
+            Please format your response as the enhanced text only, without explanations.
+            """
+
+            messages = [
+                SystemMessage(content="You are a helpful assistant that enhances document chunks for semantic search."),
+                HumanMessage(content=prompt)
+            ]
+
+            response = await self.llm.ainvoke(messages)
+            return response.content.strip()
+
+        except Exception as e:
+            logger.error(f"Error enriching chunk: {str(e)}")
+            return chunk_text  # Return original if enhancement fails
+
+    async def _create_semantic_api_representation(self, api: Dict[str, Any]) -> str:
+        """
+        Create a semantically rich representation of an API for vector storage
+        """
+        try:
+            base_text = (
+                f"API: {api['method']} {api['path']}\n"
+                f"Description: {api['description']}\n"
+                f"Parameters: {', '.join(api['parameters'])}\n"
+            )
+
+            if "responses" in api and api["responses"]:
+                base_text += f"Responses: {', '.join([str(r) for r in api['responses']])}\n"
+
+            if "additional_details" in api and api["additional_details"]:
+                base_text += f"Additional Details: {api['additional_details']}\n"
+
+            # Create prompt for Claude to enhance
+            prompt = f"""
+            I have information about an API endpoint. 
+            Please help me enhance this for semantic search by:
+
+            1. Adding common use case scenarios
+            2. Including relevant terminology and synonyms in [brackets]
+            3. Adding a brief summary that captures the essence of this API
+
+            Here is the API information:
+
+            {base_text}
+
+            Please format your response as the enhanced text only, without explanations.
+            """
+
+            messages = [
+                SystemMessage(
+                    content="You are a helpful assistant that enhances API documentation for semantic search."),
+                HumanMessage(content=prompt)
+            ]
+
+            response = await self.llm.ainvoke(messages)
+            return response.content.strip()
+
+        except Exception as e:
+            logger.error(f"Error creating semantic API representation: {str(e)}")
+            return base_text  # Return original if enhancement fails
+
+    async def _enhance_api_info(
+            self,
+            api_info: List[Dict[str, Any]],
+            chunks: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Enhance API information with Claude"""
+        if not api_info:
+            return []
+
+        # Get chunks by index to provide context for each API
+        chunks_by_index = {chunk["chunk_index"]: chunk["text"] for chunk in chunks}
+
+        enhanced_api_info = []
+
+        for api in api_info:
+            # Get chunk text for context
+            chunk_text = chunks_by_index.get(api["chunk_index"], "")
+
+            # Prepare prompt for Claude
+            prompt = f"""
+            I have extracted an API endpoint from a document. Please help enhance the information by filling in missing details. The format is:
+
+            Method: {api['method']}
+            Path: {api['path']}
+            Current description: {api['description']}
+            Current parameters: {api['parameters']}
+
+            Here is the context from the document where this API was mentioned:
+
+            {chunk_text}
+
+            Please provide:
+            1. A more complete and clear description of what this API does
+            2. A comprehensive list of parameters with their data types and whether they are required
+            3. Any noted responses or status codes
+            4. Any additional details that might be relevant
+            5. A list of semantically relevant search terms that users might use to find this API
+
+            Format your response as a JSON object with these keys: description, parameters, responses, additional_details, search_terms
+            """
+
+            try:
+                # Query Claude
+                messages = [
+                    SystemMessage(
+                        content="You are a helpful assistant that extracts and enhances API information from documentation."),
+                    HumanMessage(content=prompt)
+                ]
+
+                response = await self.llm.ainvoke(messages)
+                enhanced_data = self._extract_json_from_response(response.content)
+
+                # Update API info
+                api_copy = api.copy()
+                api_copy["description"] = enhanced_data.get("description", api["description"])
+                api_copy["parameters"] = enhanced_data.get("parameters", api["parameters"])
+                api_copy["responses"] = enhanced_data.get("responses", [])
+                api_copy["additional_details"] = enhanced_data.get("additional_details", "")
+                api_copy["search_terms"] = enhanced_data.get("search_terms", [])
+
+                enhanced_api_info.append(api_copy)
+
+            except Exception as e:
+                logger.error(f"Error enhancing API info: {str(e)}")
+                # Return original if enhancement fails
+                enhanced_api_info.append(api)
+
+        return enhanced_api_info
+
+    def _extract_json_from_response(self, response_text: str) -> Dict[str, Any]:
+        """Extract JSON from Claude's response"""
+        import json
+        import re
+
+        # Try to extract JSON block if present
+        json_match = re.search(r'```json\n(.*?)\n```', response_text, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(1)
+        else:
+            json_str = response_text
+
+        # Clean up and parse JSON
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError:
+            # If JSON parsing fails, extract fields using regex as fallback
+            result = {}
+
+            # Try to extract common fields
+            for field in ["description", "additional_details"]:
+                field_match = re.search(f'"{field}":\\s*"([^"]*)"', json_str)
+                if field_match:
+                    result[field] = field_match.group(1)
+
+            # Try to extract arrays
+            for array_field in ["parameters", "responses", "search_terms"]:
+                array_match = re.search(f'"{array_field}":\\s*(\\[[^\\]]*\\])', json_str)
+                if array_match:
+                    try:
+                        result[array_field] = json.loads(array_match.group(1))
+                    except:
+                        result[array_field] = []
+
+            return result
+
+    def _extract_page_from_chunk(self, chunk_text: str) -> Optional[int]:
+        """Extract page number from chunk text based on page markers"""
+        import re
+
+        page_match = re.search(r'--- Page (\d+) ---', chunk_text)
+        if page_match:
+            return int(page_match.group(1))
+
+        return None
+
+    def _extract_section_from_chunk(self, chunk_text: str, toc: List[Dict[str, Any]]) -> Optional[str]:
+        """
+        Determine which section a chunk belongs to based on section titles in TOC
+        """
+        if not toc:
+            return None
+
+        # Create a list of section titles with their depths
+        section_titles = [(item.get("title", ""), item.get("depth", 0)) for item in toc]
+
+        # Sort by length of title (descending) to match more specific sections first
+        section_titles.sort(key=lambda x: len(x[0]), reverse=True)
+
+        # Try to find a section title in the chunk
+        for title, depth in section_titles:
+            if title and title in chunk_text:
+                return title
+
+        return None
+
+    def _prepare_metadata_for_chroma(self, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Prepare metadata for Chroma by converting non-primitive types to strings
+
+        Args:
+            metadata: Original metadata dictionary
+
+        Returns:
+            Modified metadata dictionary with only primitive types
+        """
+        cleaned_metadata = {}
+
+        for key, value in metadata.items():
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                # These types are directly supported by Chroma
+                cleaned_metadata[key] = value
+            elif isinstance(value, list):
+                # Convert lists to comma-separated strings
+                if all(isinstance(item, (str, int, float, bool)) for item in value):
+                    cleaned_metadata[key] = ",".join(str(item) for item in value)
+                else:
+                    # For complex lists, use JSON serialization
+                    cleaned_metadata[key] = json.dumps(value)
+            elif isinstance(value, dict):
+                # Convert dictionaries to JSON strings
+                cleaned_metadata[key] = json.dumps(value)
+            else:
+                # Convert any other types to strings
+                cleaned_metadata[key] = str(value)
+
+        return cleaned_metadata
