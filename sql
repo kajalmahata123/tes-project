@@ -1,86 +1,60 @@
-# app/api/routes/bootstrap.py
+# Backend Dependencies for Content-Craft Visa API Agent
+# Updated to support Anthropic Claude 3.5 Sonnet model
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional
-import uuid
-from app.dependencies import get_db_manager
-from app.config import get_settings
-from app.db.manager import DatabaseManager
-import logging
+# Core web framework
+fastapi==0.104.1
+uvicorn[standard]==0.23.2
+python-dotenv==1.0.0
+pydantic==2.4.2
+pydantic-settings==2.0.3
+sqlalchemy==2.0.23
+aiosqlite==0.19.0
+aiofiles==23.2.1
+python-multipart==0.0.6
+httpx==0.25.1
 
-router = APIRouter()
-logger = logging.getLogger(__name__)
+# Authentication and security
+bcrypt==4.0.1
+passlib==1.7.4
+python-jose[cryptography]==3.3.0
 
+# LangChain and ML/AI dependencies (updated for Claude 3.5 Sonnet support)
+langchain==0.3.20
+langchain-anthropic==0.3.9  # Latest version with Claude 3.5 support
+anthropic>=0.46.0  # Latest Anthropic SDK with Claude 3.5 Sonnet support
+langchain-openai==0.3.7  # Updated to latest version
+langchain-community==0.3.19  # Updated to latest version
+openai==1.65.4  # Updated to latest version
+chromadb==0.4.18
+langgraph>=0.0.25  # Updated for better compatibility
+PyYAML==6.0.1
+markdown==3.5.1
 
-class BootstrapRequest(BaseModel):
-    """Bootstrap request model for initial API key creation."""
-    model_config = ConfigDict(extra="forbid")
-    
-    admin_secret: str = Field(description="Admin secret for bootstrapping")
-    app_id: str = Field(description="Application identifier")
-    app_name: str = Field(description="Human-readable application name")
-    description: Optional[str] = Field(default="Initial admin API key", description="Description")
+# Document processing
+PyMuPDF==1.23.7  # For PDF processing
+docx2txt==0.8    # For Word document processing
 
+# Data processing
+numpy==1.26.1
+pandas==2.1.2
+tiktoken==0.5.1
 
-class ApiKeyResponse(BaseModel):
-    """API key response model."""
-    model_config = ConfigDict(extra="forbid")
-    
-    id: str = Field(description="API key ID")
-    app_id: str = Field(description="Application ID")
-    api_key: str = Field(description="Clear-text API key (only included when created)")
-    app_name: str = Field(description="Application name")
-    description: Optional[str] = Field(default=None, description="Description")
-    is_active: bool = Field(description="Whether the key is active")
-    created_at: str = Field(description="Creation timestamp")
-    expires_at: Optional[str] = Field(default=None, description="Expiration timestamp")
-    rate_limit: int = Field(description="Rate limit (requests per minute)")
+# API Documentation
+swagger-ui-bundle==0.0.9
 
+# Testing and development
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.10.1
+isort==5.12.0
+mypy==1.6.1
 
-@router.post("/bootstrap", response_model=ApiKeyResponse)
-async def bootstrap_admin_key(
-        request: BootstrapRequest,
-        db_manager: DatabaseManager = Depends(get_db_manager)
-):
-    """
-    Bootstrap the first admin API key. This endpoint should be disabled in production
-    after initial setup or secured with a strong admin secret.
+# Visualization
+matplotlib==3.8.1
+mermaid-diagram==0.1.0   # For generating Mermaid diagrams
 
-    This endpoint requires only the admin secret defined in the application settings.
-    It does NOT require the X-API-Key or X-APP-ID headers.
-    """
-    # Verify admin secret
-    admin_secret = get_settings().ADMIN_BOOTSTRAP_SECRET
-    if not admin_secret or admin_secret == "change-this-in-production" or request.admin_secret != admin_secret:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid admin secret"
-        )
+# Logging
+logging-formatter-colored==1.0.5   # For enhanced logging
 
-    # Check if app_id already has API keys
-    existing_keys = await db_manager.get_app_api_keys(request.app_id)
-    if existing_keys:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Application {request.app_id} already has {len(existing_keys)} API keys"
-        )
-
-    try:
-        # Create admin API key with higher rate limit
-        key_data = await db_manager.create_api_key(
-            app_id=request.app_id,
-            app_name=request.app_name,
-            description=request.description,
-            expires_in_days=None,  # Admin key doesn't expire
-            rate_limit=500  # Higher rate limit for admin
-        )
-
-        logger.warning(f"Created bootstrap admin API key for app {request.app_id}")
-        return key_data
-    except Exception as e:
-        logger.error(f"Failed to create bootstrap API key: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="Failed to create bootstrap API key"
-        )
+# Install instructions:
+# pip install -r requirements.txt
