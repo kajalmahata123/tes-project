@@ -1,43 +1,65 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List, Optional, Dict, Any
-from datetime import datetime
+from typing import Dict, Any, List, Optional, Union
 
 
-class ChatMessage(BaseModel):
-    """Chat message schema."""
+class ToolRequest(BaseModel):
+    """Base schema for tool requests."""
     model_config = ConfigDict(extra="forbid")
     
-    role: str = Field(description="Message role (user or assistant)")
-    content: str = Field(description="Message content")
-    timestamp: str = Field(description="ISO format timestamp")
-
-    @classmethod
-    def user_message(cls, content: str) -> "ChatMessage":
-        """Create a new user message."""
-        return cls(
-            role="user",
-            content=content,
-            timestamp=datetime.now().isoformat()
-        )
-
-    @classmethod
-    def assistant_message(cls, content: str) -> "ChatMessage":
-        """Create a new assistant message."""
-        return cls(
-            role="assistant",
-            content=content,
-            timestamp=datetime.now().isoformat()
-        )
+    tool_name: str = Field(description="Name of the tool to use")
+    input: Dict[str, Any] = Field(description="Input parameters for the tool")
 
 
-class ChatSession(BaseModel):
-    """Chat session schema."""
+class DocumentationSearchRequest(BaseModel):
+    """Request schema for documentation search tool."""
     model_config = ConfigDict(extra="forbid")
     
-    session_id: str = Field(description="Session identifier")
-    user_id: Optional[str] = Field(default=None, description="User identifier")
-    agent_type: str = Field(description="Agent type")
-    created_at: str = Field(description="ISO format creation timestamp")
-    last_activity: str = Field(description="ISO format last activity timestamp")
-    messages: List[ChatMessage] = Field(default_factory=list, description="Chat messages")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Session metadata")
+    query: str = Field(description="Search query")
+    filter_criteria: Optional[Dict[str, Any]] = Field(default=None, description="Optional filters")
+    top_k: Optional[int] = Field(default=5, description="Number of results to return")
+
+
+class DocumentationSearchResult(BaseModel):
+    """Result schema for documentation search."""
+    model_config = ConfigDict(extra="forbid")
+    
+    content: str = Field(description="Document content")
+    source: str = Field(description="Document source")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Document metadata")
+    score: Optional[float] = Field(default=None, description="Search relevance score")
+
+
+class CodeGenerationRequest(BaseModel):
+    """Request schema for code generation tool."""
+    model_config = ConfigDict(extra="forbid")
+    
+    operation_id: Optional[str] = Field(default=None, description="API operation ID")
+    path: Optional[str] = Field(default=None, description="API path")
+    method: Optional[str] = Field(default=None, description="HTTP method")
+    language: str = Field(description="Programming language")
+    include_auth: bool = Field(default=True, description="Include authentication")
+    include_error_handling: bool = Field(default=True, description="Include error handling")
+
+
+class WorkflowGenerationRequest(BaseModel):
+    """Request schema for workflow generation tool."""
+    model_config = ConfigDict(extra="forbid")
+    
+    task: str = Field(description="Task description")
+    operations: List[str] = Field(default_factory=list, description="List of operations to include")
+    include_code: bool = Field(default=True, description="Include code examples")
+    language: Optional[str] = Field(default=None, description="Programming language if code is included")
+
+
+class ApiEndpoint(BaseModel):
+    """Schema for API endpoint information."""
+    model_config = ConfigDict(extra="forbid")
+    
+    path: str = Field(description="Endpoint path")
+    method: str = Field(description="HTTP method")
+    operation_id: Optional[str] = Field(default=None, description="Operation ID")
+    summary: Optional[str] = Field(default=None, description="Operation summary")
+    description: Optional[str] = Field(default=None, description="Operation description")
+    parameters: List[Dict[str, Any]] = Field(default_factory=list, description="Operation parameters")
+    request_body: Optional[Dict[str, Any]] = Field(default=None, description="Request body schema")
+    responses: Dict[str, Any] = Field(default_factory=dict, description="Response schemas")
