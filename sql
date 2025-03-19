@@ -1,65 +1,62 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Dict, Any, List, Optional, Union
+from typing import List, Optional, Dict, Any
+from datetime import datetime
 
 
-class ToolRequest(BaseModel):
-    """Base schema for tool requests."""
+class ChatMessage(BaseModel):
+    """Chat message model."""
     model_config = ConfigDict(extra="forbid")
     
-    tool_name: str = Field(description="Name of the tool to use")
-    input: Dict[str, Any] = Field(description="Input parameters for the tool")
+    role: str = Field(description="Message role (user or assistant)")
+    content: str = Field(description="Message content")
+    timestamp: str = Field(description="ISO format timestamp")
 
 
-class DocumentationSearchRequest(BaseModel):
-    """Request schema for documentation search tool."""
+class ChatRequest(BaseModel):
+    """Chat message request model."""
     model_config = ConfigDict(extra="forbid")
     
-    query: str = Field(description="Search query")
-    filter_criteria: Optional[Dict[str, Any]] = Field(default=None, description="Optional filters")
-    top_k: Optional[int] = Field(default=5, description="Number of results to return")
+    message: str = Field(description="User message")
+    session_id: Optional[str] = Field(default=None, description="Chat session ID")
+    agent_type: Optional[str] = Field(default=None, description="Agent type to use")
 
 
-class DocumentationSearchResult(BaseModel):
-    """Result schema for documentation search."""
+class ChatResponse(BaseModel):
+    """Chat message response model."""
     model_config = ConfigDict(extra="forbid")
     
-    content: str = Field(description="Document content")
-    source: str = Field(description="Document source")
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Document metadata")
-    score: Optional[float] = Field(default=None, description="Search relevance score")
+    message_id: str = Field(description="Unique message ID")
+    session_id: str = Field(description="Chat session ID")
+    response: str = Field(description="Assistant response")
+    agent_type: str = Field(description="Agent type used")
+    app_id: Optional[str] = Field(default=None, description="Application ID that owns this session")
 
 
-class CodeGenerationRequest(BaseModel):
-    """Request schema for code generation tool."""
+class SessionInfo(BaseModel):
+    """Chat session information model."""
     model_config = ConfigDict(extra="forbid")
     
-    operation_id: Optional[str] = Field(default=None, description="API operation ID")
-    path: Optional[str] = Field(default=None, description="API path")
-    method: Optional[str] = Field(default=None, description="HTTP method")
-    language: str = Field(description="Programming language")
-    include_auth: bool = Field(default=True, description="Include authentication")
-    include_error_handling: bool = Field(default=True, description="Include error handling")
+    session_id: str = Field(description="Chat session ID")
+    agent_type: str = Field(description="Agent type")
+    created_at: str = Field(description="ISO format timestamp of creation time")
+    last_activity: str = Field(description="ISO format timestamp of last activity")
+    message_count: int = Field(description="Number of messages in session")
+    app_id: Optional[str] = Field(default=None, description="Application ID that owns this session")
+    messages: Optional[List[ChatMessage]] = Field(default=None, description="Chat messages if requested")
 
 
-class WorkflowGenerationRequest(BaseModel):
-    """Request schema for workflow generation tool."""
+class SessionListResponse(BaseModel):
+    """Response model for listing sessions."""
     model_config = ConfigDict(extra="forbid")
     
-    task: str = Field(description="Task description")
-    operations: List[str] = Field(default_factory=list, description="List of operations to include")
-    include_code: bool = Field(default=True, description="Include code examples")
-    language: Optional[str] = Field(default=None, description="Programming language if code is included")
+    sessions: List[SessionInfo] = Field(description="List of session info")
+    total: int = Field(description="Total number of sessions")
+    limit: int = Field(description="Limit parameter used")
+    offset: int = Field(description="Offset parameter used")
 
 
-class ApiEndpoint(BaseModel):
-    """Schema for API endpoint information."""
+class AgentListResponse(BaseModel):
+    """Response model for listing available agents."""
     model_config = ConfigDict(extra="forbid")
     
-    path: str = Field(description="Endpoint path")
-    method: str = Field(description="HTTP method")
-    operation_id: Optional[str] = Field(default=None, description="Operation ID")
-    summary: Optional[str] = Field(default=None, description="Operation summary")
-    description: Optional[str] = Field(default=None, description="Operation description")
-    parameters: List[Dict[str, Any]] = Field(default_factory=list, description="Operation parameters")
-    request_body: Optional[Dict[str, Any]] = Field(default=None, description="Request body schema")
-    responses: Dict[str, Any] = Field(default_factory=dict, description="Response schemas")
+    agents: List[str] = Field(description="List of available agent types")
