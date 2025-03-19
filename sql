@@ -1,35 +1,25 @@
-# Core dependencies
-fastapi==0.110.0
-uvicorn==0.29.0
-pydantic==2.6.0
-python-dotenv==1.0.1
+from pydantic import BaseModel, Field, ConfigDict
+import hashlib
 
-# LangChain
-langchain>=0.3.19
-langchain-core>=0.3.40
-langchain-anthropic==0.1.10
-langchain-openai>=0.1.5
-langchain-community>=0.3.18
-langchain-text-splitters>=0.3.6
-langgraph>=0.0.50
+logger = logging.getLogger(__name__)
 
-# PDF processing
-PyMuPDF==1.24.0
-pypdf>=5.3.1
-python-magic>=0.4.27
 
-# OpenAPI processing
-pyyaml==6.0.1
-jsonschema==4.21.1
-
-# Vector database and embeddings
-chromadb>=0.6.3
-openai>=1.65.2
-tiktoken>=0.9.0
-
-# Testing
-pytest==8.0.0
-httpx==0.27.0
-
-# Security and middleware
-python-multipart==0.0.9
+class ReActState(BaseModel):
+    """State for the ReAct agent graph."""
+    model_config = ConfigDict(extra="forbid")
+    
+    input: str = Field(description="The original user input")
+    chat_history: List[BaseMessage] = Field(default_factory=list, description="Chat history")
+    thought: str = Field(default="", description="Agent's current thought")
+    action_name: Optional[str] = Field(default=None, description="Tool to use")
+    action_input: Optional[Dict[str, Any]] = Field(default=None, description="Input for the tool")
+    observation: Optional[str] = Field(default=None, description="Result from the tool")
+    output: Optional[str] = Field(default=None, description="Final response to the user")
+    iterations: int = Field(default=0, description="Number of ReAct cycles")
+    # Add accumulated knowledge tracking
+    accumulated_knowledge: Dict[str, str] = Field(default_factory=dict, description="Knowledge gathered from tools")
+    previous_queries: List[str] = Field(default_factory=list, description="Previous search queries")
+    new_request: bool = Field(default=True, description="Flag indicating if this is a new request")
+    # Session-level caches
+    tool_cache: Dict[str, str] = Field(default_factory=dict, description="Cache for tool results")
+    llm_cache: Dict[str, str] = Field(default_factory=dict, description="Cache for LLM responses")
