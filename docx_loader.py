@@ -1,207 +1,269 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Form
-from fastapi.responses import JSONResponse
-import logging
-import uuid
 import os
-import shutil
-from pathlib import Path
-import tempfile
-from typing import Optional
-from app.dependencies import get_agent_factory, verify_api_key, get_knowledge_base
-from app.core.agent_factory import AgentFactory
-from app.core.knowledge_base import KnowledgeBase
-from app.tools.document_loader_factory import DocumentLoaderFactory
+import logging
+from typing import List, Dict, Any, Optional
+import json
+from langchain_chroma import Chroma
+from langchain_openai import OpenAIEmbeddings
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import DirectoryLoader, TextLoader
+from langchain.schema import Document
+import time
+
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
 
-
-@router.post("/upload")
-async def upload_document(
-        background_tasks: BackgroundTasks,
-        file: Optional[UploadFile] = File(None),
-        url: Optional[str] = Form(None),
-        agent_factory: AgentFactory = Depends(get_agent_factory),
-        knowledge_base: KnowledgeBase = Depends(get_knowledge_base)
-):
+class KnowledgeBase:
     """
-    Upload and process a document file or scrape content from a URL.
-    The content will be loaded into the knowledge base for agent use.
-    Supports various file types including OpenAPI, PDF, text, Word, and HTML.
-    Also supports scraping content from websites.
+    Knowledge base for storing and retrieving documents using vector search.
+    Handles loading, chunking, and querying API documentation.
     """
-    if not file and not url:
-        raise HTTPException(
-            status_code=400,
-            detail="Either a file or a URL must be provided"
-        )
-    
-    if file and url:
-        raise HTTPException(
-            status_code=400,
-            detail="Please provide either a file or a URL, not both"
-        )
-    
-    try:
-        if file:
-            logger.info(f"Received file upload: {file.filename}")
-            
-            # Create temp file
-            temp_dir = Path(tempfile.gettempdir())
-            file_ext = os.path.splitext(file.filename)[1].lower()
-            temp_file = temp_dir / f"{uuid.uuid4()}{file_ext}"
 
-            # Save uploaded file
-            with open(temp_file, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+    def __init__(self, docs_path: Optional[str] = None, embedding_model: Optional[str] = None):
+        """
+        Initialize the knowledge base.
 
-            # Process file in background
-            background_tasks.add_task(
-                process_document_file,
-                str(temp_file),
-                file.filename,
-                knowledge_base
-            )
-            
-            return JSONResponse(
-                status_code=202,
-                content={
-                    "message": "Document accepted for processing",
-                    "filename": file.filename
-                }
-            )
-        else:
-            logger.info(f"Received URL for scraping: {url}")
-            
-            # Process URL in background
-            background_tasks.add_task(
-                process_document_file,
-                url,
-                url,
-                knowledge_base
-            )
-            
-            return JSONResponse(
-                status_code=202,
-                content={
-                    "message": "URL accepted for scraping",
-                    "url": url
-                }
-            )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error handling document upload: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error processing document: {str(e)}"
-        )
-    finally:
-        if file:
-            file.file.close()
-
-
-async def process_document_file(file_path: str, original_filename: str, knowledge_base: KnowledgeBase):
-    """
-    Process a document file or URL and load into knowledge base.
-    """
-    try:
-        logger.info(f"Processing document: {original_filename}")
-
-        # Ensure knowledge base is initialized
-        if not knowledge_base.vectorstore:
-            logger.info("Knowledge base not initialized in background task, initializing now")
-            await knowledge_base.initialize()
-
-        # Get the appropriate loader for this file type or URL
-        loader = DocumentLoaderFactory.get_loader(file_path, knowledge_base)
+        Args:
+            docs_path: Path to documentation files
+            embedding_model: OpenAI embedding model name
+        """
+        self.instance_id = id(self)
+        logger.info(f"Creating KnowledgeBase instance {self.instance_id}")
+        self.settings = get_settings()
+        self.docs_path = docs_path or self.settings.DOCS_PATH
+        self.embedding_model = embedding_model or self.settings.EMBEDDING_MODEL
+        self.persist_dir = self.settings.CHROMA_PERSIST_DIRECTORY
+        self.vectorstore = None
+        self.embeddings = None
+        self._initialized = False
         
-        # Check if this is an OpenAPI loader (which has a different interface)
-        if hasattr(loader, 'load_spec'):
-            # Load and validate the spec
-            spec = await loader.load_spec(file_path)
-            
-            # Process the spec and add to knowledge base
-            await loader.process_spec(spec, original_filename)
-        else:
-            # Load the document
-            documents = await loader.load_document(file_path)
-            
-            # Process the document and add to knowledge base
-            await loader.process_document(documents, original_filename)
+        # Document batching mechanism
+        self._document_buffer = []
+        self._batch_size = 10  # Process documents in batches of 10
+        self._last_batch_time = time.time()
+        self._batch_timeout = 5  # Process batch after 5 seconds even if not full
+        
+        logger.info(f"Initializing knowledge base with docs path: {self.docs_path}")
 
-        logger.info(f"Successfully processed document: {original_filename}")
+    async def initialize(self) -> None:
+        """Initialize the knowledge base resources."""
+        try:
+            # Ensure directories exist
+            os.makedirs(self.persist_dir, exist_ok=True)
+            os.makedirs(self.docs_path, exist_ok=True)
 
-    except ValueError as e:
-        logger.error(f"Error processing document {original_filename}: {e}", exc_info=True)
-    except Exception as e:
-        logger.error(f"Error processing document {original_filename}: {e}", exc_info=True)
-    finally:
-        # Clean up temporary file if it exists and is not a URL
-        if not DocumentLoaderFactory._is_url(file_path):
+            logger.info(f"Initializing embeddings with model: {self.embedding_model}")
+            # Initialize embeddings
+            self.embeddings = OpenAIEmbeddings(
+                model=self.embedding_model,
+                openai_api_key=self.settings.OPENAI_API_KEY
+            )
+            logger.info("Embeddings initialized successfully")
+
             try:
-                if os.path.exists(file_path):
-                    os.unlink(file_path)
+                # Try creating a test embedding to verify API access
+                logger.info("Testing embedding API connection...")
+               # test_embedding = await self.embeddings.aembed_query("test")
+                #logger.info(f"Test embedding successful, dimension: {len(test_embedding)}")
             except Exception as e:
-                logger.error(f"Error removing temporary file {file_path}: {e}")
+                logger.error(f"Error testing embeddings API: {e}", exc_info=True)
+                raise RuntimeError(f"Failed to connect to OpenAI Embeddings API: {e}")
 
+            logger.info(f"Initializing vector store at {self.persist_dir}")
+            try:
+                self.vectorstore = Chroma(
+                    persist_directory=self.persist_dir,
+                    embedding_function=self.embeddings
+                )
+                logger.info("Vector store initialized successfully")
+            except Exception as e:
+                logger.error(f"Error initializing Chroma vector store: {e}", exc_info=True)
+                raise RuntimeError(f"Failed to initialize Chroma: {e}")
 
-# Keep the original OpenAPI-specific endpoint for backward compatibility
-@router.post("/openapi-spec")
-async def upload_openapi_spec(
-        background_tasks: BackgroundTasks,
-        file: UploadFile = File(...),
-        agent_factory: AgentFactory = Depends(get_agent_factory),
-        knowledge_base: KnowledgeBase = Depends(get_knowledge_base)
-):
-    """
-    Upload and process an OpenAPI specification file.
-    The file will be loaded into the knowledge base for agent use.
-    """
-    logger.info(f"Received OpenAPI file upload: {file.filename}")
+            self._initialized = True
+            logger.info("Knowledge base fully initialized")
 
-    try:
-        # Validate file extension
-        file_ext = os.path.splitext(file.filename)[1].lower()
-        if file_ext not in ['.json', '.yaml', '.yml']:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid file format. Only JSON and YAML OpenAPI files are supported."
+        except Exception as e:
+            logger.error(f"Failed to initialize knowledge base: {e}", exc_info=True)
+            self.vectorstore = None
+            raise
+
+    async def load_documents(self) -> None:
+        """
+        Load documents from the docs path, chunk them, and add to the vector store.
+        """
+        try:
+            # Create document loader
+            loader = DirectoryLoader(
+                self.docs_path,
+                glob="**/*.{json,md,txt}",
+                loader_cls=TextLoader
             )
 
-        # Create temp file
-        temp_dir = Path(tempfile.gettempdir())
-        temp_file = temp_dir / f"{uuid.uuid4()}{file_ext}"
+            # Load documents
+            documents = loader.load()
+            logger.info(f"Loaded {len(documents)} documents from {self.docs_path}")
 
-        # Save uploaded file
-        with open(temp_file, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+            # Create text splitter
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=self.settings.DOCS_CHUNK_SIZE,
+                chunk_overlap=self.settings.DOCS_CHUNK_OVERLAP,
+                separators=["\n\n", "\n", " ", ""]
+            )
 
-        # Process file in background
-        background_tasks.add_task(
-            process_document_file,
-            str(temp_file),
-            file.filename,
-            knowledge_base
-        )
+            # Split documents into chunks
+            chunks = text_splitter.split_documents(documents)
+            logger.info(f"Split into {len(chunks)} chunks")
 
-        return JSONResponse(
-            status_code=202,
-            content={
-                "message": "OpenAPI specification accepted for processing",
-                "filename": file.filename
-            }
-        )
+            # Add metadata to chunks
+            for chunk in chunks:
+                # Extract relative path for better identification
+                rel_path = os.path.relpath(chunk.metadata["source"], self.docs_path)
+                chunk.metadata["path"] = rel_path
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error handling OpenAPI upload: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="Error processing OpenAPI file"
-        )
-    finally:
-        file.file.close()
+                # Add file type
+                chunk.metadata["filetype"] = os.path.splitext(rel_path)[1]
+
+                # Try to identify section from JSON files
+                if chunk.metadata["filetype"] == ".json":
+                    try:
+                        content_json = json.loads(chunk.page_content)
+                        if "info" in content_json:
+                            chunk.metadata["api_version"] = content_json.get("info", {}).get("version", "unknown")
+                            chunk.metadata["api_title"] = content_json.get("info", {}).get("title", "unknown")
+                    except json.JSONDecodeError:
+                        pass
+
+            # Use batch processing for embeddings
+            logger.info(f"Adding {len(chunks)} chunks to vector store using batch processing")
+            
+            # Add chunks to vector store in batches
+            batch_size = 100  # Process in batches of 100 chunks
+            for i in range(0, len(chunks), batch_size):
+                batch = chunks[i:i+batch_size]
+                logger.info(f"Processing batch {i//batch_size + 1} of {(len(chunks) + batch_size - 1)//batch_size} ({len(batch)} chunks)")
+                self.vectorstore.add_documents(batch)
+
+            # Persist vector store
+            self.vectorstore.persist()
+            logger.info("Documents processed and added to vector store")
+
+        except Exception as e:
+            logger.error(f"Error loading documents: {e}", exc_info=True)
+            raise
+
+    async def search(self, query: str, top_k: int = 5, filter_criteria: Optional[Dict[str, Any]] = None) -> List[
+        Document]:
+        """
+        Search the knowledge base for relevant documents.
+
+        Args:
+            query: Search query
+            top_k: Number of results to return
+            filter_criteria: Optional filter criteria for metadata
+
+        Returns:
+            List of relevant documents
+        """
+        if not self._initialized or not self.vectorstore:
+            logger.warning("Knowledge base not fully initialized, returning empty results")
+            return []
+
+        try:
+            # Use batch processing for embeddings
+            logger.info(f"Searching for '{query[:50]}...' using batch processing")
+            
+            results = self.vectorstore.similarity_search(
+                query=query,
+                k=top_k,
+                filter=filter_criteria
+            )
+            logger.info(f"Search for '{query[:50]}...' returned {len(results)} results")
+            return results
+        except Exception as e:
+            logger.error(f"Error searching knowledge base: {e}", exc_info=True)
+            return []
+
+    async def add_document(self, content: str, metadata: Dict[str, Any]) -> None:
+        """
+        Add a new document to the knowledge base.
+        Documents are collected in a buffer and processed in batches for efficiency.
+        """
+        logger.info(f"Adding document to KnowledgeBase instance {self.instance_id}")
+
+        if not hasattr(self, 'vectorstore') or self.vectorstore is None:
+            logger.error(f"Failed to initialize vector store for add_document")
+            # Try to reinitialize
+            try:
+                logger.info(f"Attempting to reinitialize vectorstore in instance {self.instance_id}")
+                await self.initialize()
+            except Exception as e:
+                logger.error(f"Reinitialization failed: {e}")
+                return
+
+        if not hasattr(self, 'vectorstore') or self.vectorstore is None:
+            logger.error(f"Vector store still not available after reinitialization")
+            return
+
+        try:
+            # Create document
+            document = Document(page_content=content, metadata=metadata)
+            
+            # Add to buffer
+            self._document_buffer.append(document)
+            
+            # Check if we should process the batch
+            current_time = time.time()
+            time_since_last_batch = current_time - self._last_batch_time
+            
+            # Process batch if buffer is full or timeout reached
+            if len(self._document_buffer) >= self._batch_size or time_since_last_batch >= self._batch_timeout:
+                await self._process_document_batch()
+                
+        except Exception as e:
+            logger.error(f"Error adding document: {e}", exc_info=True)
+    
+    async def _process_document_batch(self) -> None:
+        """
+        Process the current document buffer in a batch.
+        """
+        if not self._document_buffer:
+            return
+            
+        try:
+            # Create text splitter
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=self.settings.DOCS_CHUNK_SIZE,
+                chunk_overlap=self.settings.DOCS_CHUNK_OVERLAP
+            )
+            
+            # Split all documents in the buffer
+            all_chunks = []
+            for doc in self._document_buffer:
+                chunks = text_splitter.split_documents([doc])
+                all_chunks.extend(chunks)
+            
+            # Log batch processing
+            logger.info(f"Processing batch of {len(self._document_buffer)} documents, creating {len(all_chunks)} chunks")
+            
+            # Process in smaller sub-batches if needed
+            sub_batch_size = 100
+            for i in range(0, len(all_chunks), sub_batch_size):
+                sub_batch = all_chunks[i:i+sub_batch_size]
+                logger.info(f"Adding sub-batch {i//sub_batch_size + 1} of {(len(all_chunks) + sub_batch_size - 1)//sub_batch_size} ({len(sub_batch)} chunks)")
+                self.vectorstore.add_documents(sub_batch)
+            
+            # Persist changes
+            self.vectorstore.persist()
+            
+            # Clear buffer and update last batch time
+            self._document_buffer = []
+            self._last_batch_time = time.time()
+            
+            logger.info(f"Successfully processed batch of documents")
+            
+        except Exception as e:
+            logger.error(f"Error processing document batch: {e}", exc_info=True)
+            # Keep documents in buffer for retry
+            logger.info("Keeping documents in buffer for retry")
