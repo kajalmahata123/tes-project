@@ -1,4 +1,4 @@
-# Content-Craft Visa API Agent
+# Content-Craft 
 
 A specialized application for providing AI-assisted guidance on Visa API implementation and integration. This project consists of a FastAPI backend with LangChain-powered AI agents and a React frontend.
 
