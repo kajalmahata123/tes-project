@@ -1,80 +1,207 @@
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Form
+from fastapi.responses import JSONResponse
 import logging
-from typing import Dict, Any, List
+import uuid
 import os
+import shutil
+from pathlib import Path
+import tempfile
+from typing import Optional
+from app.dependencies import get_agent_factory, verify_api_key, get_knowledge_base
+from app.core.agent_factory import AgentFactory
 from app.core.knowledge_base import KnowledgeBase
-from langchain.schema import Document
-from langchain_community.document_loaders import Docx2txtLoader
+from app.tools.document_loader_factory import DocumentLoaderFactory
 
 logger = logging.getLogger(__name__)
 
+router = APIRouter()
 
-class DocxLoader:
+
+@router.post("/upload")
+async def upload_document(
+        background_tasks: BackgroundTasks,
+        file: Optional[UploadFile] = File(None),
+        url: Optional[str] = Form(None),
+        agent_factory: AgentFactory = Depends(get_agent_factory),
+        knowledge_base: KnowledgeBase = Depends(get_knowledge_base)
+):
     """
-    Tool for loading and processing Word documents.
-    Extracts content from DOCX files.
+    Upload and process a document file or scrape content from a URL.
+    The content will be loaded into the knowledge base for agent use.
+    Supports various file types including OpenAPI, PDF, text, Word, and HTML.
+    Also supports scraping content from websites.
     """
-
-    def __init__(self, knowledge_base: KnowledgeBase):
-        """
-        Initialize the Word document loader.
-
-        Args:
-            knowledge_base: Knowledge base to store processed documents
-        """
-        self.knowledge_base = knowledge_base
-        logger.info("Initialized Word document loader")
-
-    async def load_document(self, file_path: str) -> List[Document]:
-        """
-        Load and parse a Word document.
-
-        Args:
-            file_path: Path to the DOCX file
-
-        Returns:
-            List of Document objects containing the document content
-
-        Raises:
-            ValueError: If file is not a valid DOCX file
-        """
-        logger.info(f"Loading Word document from {file_path}")
-
-        try:
-            # Load DOCX using Docx2txtLoader
-            loader = Docx2txtLoader(file_path)
-            documents = loader.load()
+    if not file and not url:
+        raise HTTPException(
+            status_code=400,
+            detail="Either a file or a URL must be provided"
+        )
+    
+    if file and url:
+        raise HTTPException(
+            status_code=400,
+            detail="Please provide either a file or a URL, not both"
+        )
+    
+    try:
+        if file:
+            logger.info(f"Received file upload: {file.filename}")
             
-            return documents
-        except Exception as e:
-            logger.error(f"Error loading Word document: {e}", exc_info=True)
-            raise ValueError(f"Failed to load Word document: {str(e)}")
+            # Create temp file
+            temp_dir = Path(tempfile.gettempdir())
+            file_ext = os.path.splitext(file.filename)[1].lower()
+            temp_file = temp_dir / f"{uuid.uuid4()}{file_ext}"
 
-    async def process_document(self, documents: List[Document], file_name: str) -> None:
-        """
-        Process Word documents and add to knowledge base.
+            # Save uploaded file
+            with open(temp_file, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
 
-        Args:
-            documents: List of Document objects from the DOCX file
-            file_name: Original filename
-        """
-        logger.info(f"Processing Word document: {file_name}")
-
-        try:
-            # Add each document to the knowledge base
-            for i, doc in enumerate(documents):
-                metadata = {
-                    "source": file_name,
-                    "file_type": "docx",
-                    "document_type": "word"
+            # Process file in background
+            background_tasks.add_task(
+                process_document_file,
+                str(temp_file),
+                file.filename,
+                knowledge_base
+            )
+            
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "message": "Document accepted for processing",
+                    "filename": file.filename
                 }
-                
-                # Update metadata with any existing metadata
-                if doc.metadata:
-                    metadata.update(doc.metadata)
-                
-                await self.knowledge_base.add_document(doc.page_content, metadata)
+            )
+        else:
+            logger.info(f"Received URL for scraping: {url}")
             
-            logger.info(f"Successfully processed Word document: {file_name}")
-        except Exception as e:
-            logger.error(f"Error processing Word document: {e}", exc_info=True)
-            raise 
+            # Process URL in background
+            background_tasks.add_task(
+                process_document_file,
+                url,
+                url,
+                knowledge_base
+            )
+            
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "message": "URL accepted for scraping",
+                    "url": url
+                }
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error handling document upload: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error processing document: {str(e)}"
+        )
+    finally:
+        if file:
+            file.file.close()
+
+
+async def process_document_file(file_path: str, original_filename: str, knowledge_base: KnowledgeBase):
+    """
+    Process a document file or URL and load into knowledge base.
+    """
+    try:
+        logger.info(f"Processing document: {original_filename}")
+
+        # Ensure knowledge base is initialized
+        if not knowledge_base.vectorstore:
+            logger.info("Knowledge base not initialized in background task, initializing now")
+            await knowledge_base.initialize()
+
+        # Get the appropriate loader for this file type or URL
+        loader = DocumentLoaderFactory.get_loader(file_path, knowledge_base)
+        
+        # Check if this is an OpenAPI loader (which has a different interface)
+        if hasattr(loader, 'load_spec'):
+            # Load and validate the spec
+            spec = await loader.load_spec(file_path)
+            
+            # Process the spec and add to knowledge base
+            await loader.process_spec(spec, original_filename)
+        else:
+            # Load the document
+            documents = await loader.load_document(file_path)
+            
+            # Process the document and add to knowledge base
+            await loader.process_document(documents, original_filename)
+
+        logger.info(f"Successfully processed document: {original_filename}")
+
+    except ValueError as e:
+        logger.error(f"Error processing document {original_filename}: {e}", exc_info=True)
+    except Exception as e:
+        logger.error(f"Error processing document {original_filename}: {e}", exc_info=True)
+    finally:
+        # Clean up temporary file if it exists and is not a URL
+        if not DocumentLoaderFactory._is_url(file_path):
+            try:
+                if os.path.exists(file_path):
+                    os.unlink(file_path)
+            except Exception as e:
+                logger.error(f"Error removing temporary file {file_path}: {e}")
+
+
+# Keep the original OpenAPI-specific endpoint for backward compatibility
+@router.post("/openapi-spec")
+async def upload_openapi_spec(
+        background_tasks: BackgroundTasks,
+        file: UploadFile = File(...),
+        agent_factory: AgentFactory = Depends(get_agent_factory),
+        knowledge_base: KnowledgeBase = Depends(get_knowledge_base)
+):
+    """
+    Upload and process an OpenAPI specification file.
+    The file will be loaded into the knowledge base for agent use.
+    """
+    logger.info(f"Received OpenAPI file upload: {file.filename}")
+
+    try:
+        # Validate file extension
+        file_ext = os.path.splitext(file.filename)[1].lower()
+        if file_ext not in ['.json', '.yaml', '.yml']:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid file format. Only JSON and YAML OpenAPI files are supported."
+            )
+
+        # Create temp file
+        temp_dir = Path(tempfile.gettempdir())
+        temp_file = temp_dir / f"{uuid.uuid4()}{file_ext}"
+
+        # Save uploaded file
+        with open(temp_file, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Process file in background
+        background_tasks.add_task(
+            process_document_file,
+            str(temp_file),
+            file.filename,
+            knowledge_base
+        )
+
+        return JSONResponse(
+            status_code=202,
+            content={
+                "message": "OpenAPI specification accepted for processing",
+                "filename": file.filename
+            }
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error handling OpenAPI upload: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Error processing OpenAPI file"
+        )
+    finally:
+        file.file.close()
