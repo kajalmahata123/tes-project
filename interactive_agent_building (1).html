@@ -1,0 +1,2292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive AI Agent Building Session</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            color: #7f8c8d;
+        }
+
+        .session-nav {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .nav-btn {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 25px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .nav-btn:hover, .nav-btn.active {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+
+        .session-content {
+            background: white;
+            border-radius: 15px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            display: none;
+        }
+
+        .session-content.active {
+            display: block;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .concept-card {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-left: 5px solid #667eea;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .concept-card:hover {
+            transform: translateX(10px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+        }
+
+        .concept-title {
+            font-size: 1.5em;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .code-example {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 0;
+            border-radius: 12px;
+            margin: 20px 0;
+            font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            border: 1px solid #3e3e3e;
+        }
+
+        .code-title {
+            background: #2d2d30;
+            color: #cccccc;
+            padding: 12px 20px;
+            border-bottom: 1px solid #3e3e3e;
+            font-size: 0.9em;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .code-title::before {
+            content: "●●●";
+            color: #ff5f56;
+            letter-spacing: 2px;
+        }
+
+        .code-content {
+            padding: 25px;
+            line-height: 1.6;
+            font-size: 14px;
+            background: #1e1e1e;
+            position: relative;
+        }
+
+        .code-content::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 50px;
+            background: #252526;
+            border-right: 1px solid #3e3e3e;
+        }
+
+        .code-line {
+            position: relative;
+            padding-left: 65px;
+            min-height: 20px;
+        }
+
+        .code-line::before {
+            content: attr(data-line);
+            position: absolute;
+            left: 15px;
+            color: #858585;
+            font-size: 12px;
+            width: 30px;
+            text-align: right;
+        }
+
+        /* Syntax highlighting */
+        .keyword { color: #569cd6; }
+        .string { color: #ce9178; }
+        .comment { color: #6a9955; font-style: italic; }
+        .function { color: #dcdcaa; }
+        .variable { color: #9cdcfe; }
+        .operator { color: #d4d4d4; }
+        .import { color: #c586c0; }
+
+        .interactive-demo {
+            background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%);
+            border: 2px solid #28a745;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 25px 0;
+        }
+
+        .demo-controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .demo-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .demo-btn:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+
+        .demo-output {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100px;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            font-size: 14px;
+        }
+
+        .demo-output h4 {
+            color: #ffffff !important;
+            margin-bottom: 15px !important;
+        }
+
+        .demo-output div {
+            color: inherit !important;
+        }
+
+        .demo-output strong {
+            color: inherit !important;
+            font-weight: bold;
+        }
+
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin: 25px 0;
+        }
+
+        .comparison-card {
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .langchain-card {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%);
+            border: 3px solid #fdcb6e;
+        }
+
+        .langgraph-card {
+            background: linear-gradient(135deg, #a8e6cf 0%, #88d8c0 100%);
+            border: 3px solid #6c5ce7;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: center;
+            margin: 30px 0;
+            gap: 15px;
+        }
+
+        .step {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #6c757d;
+            transition: all 0.3s ease;
+        }
+
+        .step.active {
+            background: #667eea;
+            color: white;
+            transform: scale(1.2);
+        }
+
+        .step.completed {
+            background: #28a745;
+            color: white;
+        }
+
+        .architecture-diagram {
+            background: white;
+            border: 2px solid #dee2e6;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 25px 0;
+            text-align: center;
+        }
+
+        .agent-flow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .flow-step {
+            background: #667eea;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            min-width: 120px;
+            text-align: center;
+            position: relative;
+        }
+
+        .flow-arrow {
+            font-size: 24px;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .tips-box {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 50%);
+            border: 2px solid #ffc107;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 25px 0;
+        }
+
+        .tips-title {
+            font-size: 1.3em;
+            color: #856404;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .progress-bar {
+            background: #e9ecef;
+            height: 8px;
+            border-radius: 4px;
+            margin: 20px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            height: 100%;
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        @media (max-width: 768px) {
+            .comparison-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .agent-flow {
+                flex-direction: column;
+            }
+            
+            .flow-arrow {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 Interactive AI Agent Building Session</h1>
+            <p>Master LangChain & LangGraph with hands-on examples and minimal code</p>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressBar"></div>
+            </div>
+        </div>
+
+        <div class="session-nav">
+            <button class="nav-btn active" onclick="showSession('intro')">📚 Introduction</button>
+            <button class="nav-btn" onclick="showSession('langchain')">🔗 LangChain Basics</button>
+            <button class="nav-btn" onclick="showSession('langgraph')">📊 LangGraph Flow</button>
+            <button class="nav-btn" onclick="showSession('building')">🛠️ Building Agents</button>
+            <button class="nav-btn" onclick="showSession('advanced')">🚀 Advanced Patterns</button>
+            <button class="nav-btn" onclick="showSession('practice')">💻 Hands-on Practice</button>
+        </div>
+
+        <!-- Introduction Session -->
+        <div id="intro" class="session-content active">
+            <h2>🎯 Welcome to Agent Building Workshop</h2>
+            
+            <!-- Hero Section with Visual Impact -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; border-radius: 20px; text-align: center; margin-bottom: 30px; position: relative; overflow: hidden;">
+                <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: rgba(255,255,255,0.1); border-radius: 50%; opacity: 0.5;"></div>
+                <div style="position: absolute; bottom: -30px; left: -30px; width: 150px; height: 150px; background: rgba(255,255,255,0.1); border-radius: 50%; opacity: 0.3;"></div>
+                <h1 style="font-size: 2.5em; margin-bottom: 20px; position: relative; z-index: 2;">🤖 From Chatbots to Intelligent Agents</h1>
+                <p style="font-size: 1.3em; opacity: 0.95; position: relative; z-index: 2;">Transform AI from simple Q&A tools into autonomous problem-solving partners</p>
+                <div style="margin-top: 30px; position: relative; z-index: 2;">
+                    <button class="demo-btn" onclick="showEvolutionDemo()" style="background: rgba(255,255,255,0.2); border: 2px solid white; color: white; font-size: 1.1em; padding: 15px 30px;">🚀 See the Evolution</button>
+                </div>
+            </div>
+
+            <!-- Evolution Demonstration -->
+            <div id="evolutionDemo" style="display: none; background: #f8f9fa; border-radius: 15px; padding: 30px; margin: 25px 0; border: 3px solid #28a745;">
+                <h3 style="text-align: center; color: #28a745; margin-bottom: 25px;">📈 The AI Evolution Journey</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                    
+                    <div style="background: #ffebee; padding: 20px; border-radius: 10px; border-left: 5px solid #f44336;">
+                        <h4 style="color: #d32f2f; margin-bottom: 15px;">❌ Traditional Chatbots (2020)</h4>
+                        <div style="font-family: monospace; background: #fff; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                            <strong>You:</strong> "Book me a flight to Paris"<br>
+                            <strong>Bot:</strong> "I can't book flights. Please visit our website."
+                        </div>
+                        <p style="color: #666; font-size: 0.9em;">Limited to pre-programmed responses</p>
+                    </div>
+
+                    <div style="background: #fff3e0; padding: 20px; border-radius: 10px; border-left: 5px solid #ff9800;">
+                        <h4 style="color: #f57c00; margin-bottom: 15px;">⚡ Smart Assistants (2023)</h4>
+                        <div style="font-family: monospace; background: #fff; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                            <strong>You:</strong> "Book me a flight to Paris"<br>
+                            <strong>AI:</strong> "I'd be happy to help you find flights to Paris! However, I can't actually book them. Let me search for options..."
+                        </div>
+                        <p style="color: #666; font-size: 0.9em;">Understands context but can't take action</p>
+                    </div>
+
+                    <div style="background: #e8f5e8; padding: 20px; border-radius: 10px; border-left: 5px solid #4caf50;">
+                        <h4 style="color: #388e3c; margin-bottom: 15px;">🚀 AI Agents (2024+)</h4>
+                        <div style="font-family: monospace; background: #fff; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                            <strong>You:</strong> "Book me a flight to Paris"<br>
+                            <strong>Agent:</strong> "✅ Found 3 options, checked your calendar, booked the 2pm flight that works with your schedule, sent confirmation to your email!"
+                        </div>
+                        <p style="color: #666; font-size: 0.9em;">Takes complete autonomous action</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    🤔 What Makes AI Agents Special?
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 20px;">
+                    
+                    <div style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); padding: 20px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 3em; margin-bottom: 10px;">🧠</div>
+                        <h4 style="color: #1976d2; margin-bottom: 10px;">Think</h4>
+                        <p style="font-size: 0.9em; color: #424242;">Analyze complex problems and break them into steps</p>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%); padding: 20px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 3em; margin-bottom: 10px;">📋</div>
+                        <h4 style="color: #7b1fa2; margin-bottom: 10px;">Plan</h4>
+                        <p style="font-size: 0.9em; color: #424242;">Create step-by-step strategies to achieve goals</p>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%); padding: 20px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 3em; margin-bottom: 10px;">⚡</div>
+                        <h4 style="color: #388e3c; margin-bottom: 10px;">Act</h4>
+                        <p style="font-size: 0.9em; color: #424242;">Execute plans using tools and external systems</p>
+                    </div>
+
+                    <div style="background: linear-gradient(135deg, #fff3e0 0%, #ffcc02 100%); padding: 20px; border-radius: 12px; text-align: center;">
+                        <div style="font-size: 3em; margin-bottom: 10px;">🔄</div>
+                        <h4 style="color: #f57c00; margin-bottom: 10px;">Adapt</h4>
+                        <p style="font-size: 0.9em; color: #424242;">Learn from results and improve over time</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Scenario Demonstration -->
+            <div class="interactive-demo">
+                <h3>🎮 Interactive Demo: See Agents in Action!</h3>
+                <p style="margin-bottom: 20px;">Choose a scenario to see how different AI systems would handle it:</p>
+                <div class="demo-controls">
+                    <button class="demo-btn" onclick="runScenarioDemo('travel')">✈️ Travel Planning</button>
+                    <button class="demo-btn" onclick="runScenarioDemo('meeting')">📅 Meeting Setup</button>
+                    <button class="demo-btn" onclick="runScenarioDemo('research')">🔬 Research Task</button>
+                    <button class="demo-btn" onclick="runScenarioDemo('emergency')">🚨 Emergency Response</button>
+                </div>
+                <div class="demo-output" id="scenarioOutput">Choose a scenario above to see the difference between traditional AI and intelligent agents!</div>
+            </div>
+
+            <div class="comparison-grid">
+                <div class="langchain-card comparison-card">
+                    <h3>🔗 LangChain</h3>
+                    <p><strong>"The LEGO Approach"</strong></p>
+                    <div style="text-align: center; margin: 15px 0;">
+                        <div style="display: inline-block; width: 30px; height: 30px; background: #ff6b6b; border-radius: 4px; margin: 2px;"></div>
+                        <div style="display: inline-block; width: 30px; height: 30px; background: #4ecdc4; border-radius: 4px; margin: 2px;"></div>
+                        <div style="display: inline-block; width: 30px; height: 30px; background: #45b7d1; border-radius: 4px; margin: 2px;"></div>
+                    </div>
+                    <ul style="text-align: left;">
+                        <li>✅ <strong>Simple to learn</strong> - like building with blocks</li>
+                        <li>✅ <strong>Quick results</strong> - get started in minutes</li>
+                        <li>✅ <strong>Linear workflows</strong> - A → B → C</li>
+                        <li>✅ <strong>Perfect for beginners</strong></li>
+                    </ul>
+                    <div style="background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px; margin-top: 15px;">
+                        <em>Best for: Task automation, simple workflows, getting started</em>
+                    </div>
+                </div>
+
+                <div class="langgraph-card comparison-card">
+                    <h3>📊 LangGraph</h3>
+                    <p><strong>"The Brain Approach"</strong></p>
+                    <div style="text-align: center; margin: 15px 0;">
+                        <svg width="80" height="60" viewBox="0 0 80 60">
+                            <circle cx="40" cy="30" r="25" fill="#6c5ce7" opacity="0.3"/>
+                            <circle cx="20" cy="20" r="8" fill="#6c5ce7"/>
+                            <circle cx="60" cy="20" r="8" fill="#6c5ce7"/>
+                            <circle cx="40" cy="45" r="8" fill="#6c5ce7"/>
+                            <line x1="20" y1="20" x2="40" y2="45" stroke="#6c5ce7" stroke-width="2"/>
+                            <line x1="60" y1="20" x2="40" y2="45" stroke="#6c5ce7" stroke-width="2"/>
+                        </svg>
+                    </div>
+                    <ul style="text-align: left;">
+                        <li>✅ <strong>Smart decisions</strong> - if/then logic</li>
+                        <li>✅ <strong>Memory & state</strong> - remembers context</li>
+                        <li>✅ <strong>Loops & retries</strong> - keeps trying until success</li>
+                        <li>✅ <strong>Complex reasoning</strong></li>
+                    </ul>
+                    <div style="background: rgba(255,255,255,0.5); padding: 10px; border-radius: 8px; margin-top: 15px;">
+                        <em>Best for: Complex agents, decision trees, intelligent behavior</em>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-World Impact -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 15px; margin: 25px 0;">
+                <h3 style="text-align: center; margin-bottom: 25px;">🌍 Real-World Impact</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; text-align: center;">
+                    
+                    <div>
+                        <div style="font-size: 2.5em; margin-bottom: 10px;">🏢</div>
+                        <h4>Business</h4>
+                        <p style="font-size: 0.9em; opacity: 0.9;">Automate customer service, sales, and operations</p>
+                    </div>
+
+                    <div>
+                        <div style="font-size: 2.5em; margin-bottom: 10px;">🏥</div>
+                        <h4>Healthcare</h4>
+                        <p style="font-size: 0.9em; opacity: 0.9;">Patient monitoring, appointment scheduling, care coordination</p>
+                    </div>
+
+                    <div>
+                        <div style="font-size: 2.5em; margin-bottom: 10px;">🏠</div>
+                        <h4>Personal</h4>
+                        <p style="font-size: 0.9em; opacity: 0.9;">Smart homes, personal assistants, life optimization</p>
+                    </div>
+
+                    <div>
+                        <div style="font-size: 2.5em; margin-bottom: 10px;">💻</div>
+                        <h4>Development</h4>
+                        <p style="font-size: 0.9em; opacity: 0.9;">Code generation, testing, deployment automation</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="architecture-diagram">
+                <h3>🏗️ How Agents Actually Work</h3>
+                <div style="background: #f8f9fa; padding: 25px; border-radius: 15px; margin: 20px 0;">
+                    <div class="agent-flow">
+                        <div class="flow-step" style="background: #e3f2fd; color: #1976d2;">📝 "Book me a restaurant"</div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-step" style="background: #f3e5f5; color: #7b1fa2;">🧠 Plan: Search → Check availability → Book</div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-step" style="background: #e8f5e8; color: #388e3c;">🔧 Use: Search API, Calendar API, Booking API</div>
+                        <div class="flow-arrow">→</div>
+                        <div class="flow-step" style="background: #fff3e0; color: #f57c00;">✅ "Reserved table for 2 at 7pm"</div>
+                    </div>
+                </div>
+                <p style="text-align: center; color: #666; font-style: italic; margin-top: 15px;">
+                    Unlike chatbots that just respond, agents actually <strong>DO</strong> things for you!
+                </p>
+            </div>
+        </div>
+
+        <!-- LangChain Session -->
+        <div id="langchain" class="session-content">
+            <h2>🔗 LangChain: Building Block Approach</h2>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    🧩 Think of LangChain as LEGO Blocks
+                </div>
+                <p>LangChain provides pre-built components that you snap together to create agents. Perfect for linear workflows where one step leads to the next.</p>
+            </div>
+
+            <div class="step-indicator">
+                <div class="step completed">1</div>
+                <div class="step active">2</div>
+                <div class="step">3</div>
+                <div class="step">4</div>
+                <div class="step">5</div>
+            </div>
+
+            <div class="code-example">
+                <div class="code-title">📝 Simple LangChain Agent (5 lines of code!)</div>
+                <div class="code-content">
+<div class="code-line" data-line="1"><span class="import">from</span> <span class="string">langchain.agents</span> <span class="import">import</span> <span class="function">create_openai_tools_agent</span>, <span class="function">AgentExecutor</span></div>
+<div class="code-line" data-line="2"><span class="import">from</span> <span class="string">langchain_openai</span> <span class="import">import</span> <span class="function">ChatOpenAI</span></div>
+<div class="code-line" data-line="3"><span class="import">from</span> <span class="string">langchain.tools</span> <span class="import">import</span> <span class="function">DuckDuckGoSearchRun</span></div>
+<div class="code-line" data-line="4"></div>
+<div class="code-line" data-line="5"><span class="comment"># 1. Create AI model</span></div>
+<div class="code-line" data-line="6"><span class="variable">llm</span> <span class="operator">=</span> <span class="function">ChatOpenAI</span>(<span class="variable">model</span>=<span class="string">"gpt-4"</span>)</div>
+<div class="code-line" data-line="7"></div>
+<div class="code-line" data-line="8"><span class="comment"># 2. Add tools</span></div>
+<div class="code-line" data-line="9"><span class="variable">tools</span> <span class="operator">=</span> [<span class="function">DuckDuckGoSearchRun</span>()]</div>
+<div class="code-line" data-line="10"></div>
+<div class="code-line" data-line="11"><span class="comment"># 3. Create agent</span></div>
+<div class="code-line" data-line="12"><span class="variable">agent</span> <span class="operator">=</span> <span class="function">create_openai_tools_agent</span>(<span class="variable">llm</span>, <span class="variable">tools</span>, <span class="variable">prompt</span>)</div>
+<div class="code-line" data-line="13"></div>
+<div class="code-line" data-line="14"><span class="comment"># 4. Create executor</span></div>
+<div class="code-line" data-line="15"><span class="variable">executor</span> <span class="operator">=</span> <span class="function">AgentExecutor</span>(<span class="variable">agent</span>=<span class="variable">agent</span>, <span class="variable">tools</span>=<span class="variable">tools</span>)</div>
+<div class="code-line" data-line="16"></div>
+<div class="code-line" data-line="17"><span class="comment"># 5. Run!</span></div>
+<div class="code-line" data-line="18"><span class="variable">result</span> <span class="operator">=</span> <span class="variable">executor</span>.<span class="function">invoke</span>({<span class="string">"input"</span>: <span class="string">"What's the weather in Tokyo?"</span>})</div>
+                </div>
+            </div>
+
+            <div class="interactive-demo">
+                <h3>🎮 Interactive Demo: LangChain Agent</h3>
+                <div class="demo-controls">
+                    <button class="demo-btn" onclick="runLangChainDemo('search')">🔍 Search Demo</button>
+                    <button class="demo-btn" onclick="runLangChainDemo('calculator')">🧮 Calculator Demo</button>
+                    <button class="demo-btn" onclick="runLangChainDemo('chain')">⛓️ Chain Demo</button>
+                </div>
+                <div class="demo-output" id="langchainOutput">Click a demo button to see LangChain in action!</div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    ⚡ Real Example: Customer Service Agent
+                </div>
+                <div class="code-example">
+                    <div class="code-title">🎯 Customer Service Bot (10 lines)</div>
+                    <div class="code-content">
+<div class="code-line" data-line="1"><span class="import">from</span> <span class="string">langchain.tools</span> <span class="import">import</span> <span class="function">WikipediaQueryRun</span></div>
+<div class="code-line" data-line="2"><span class="import">from</span> <span class="string">langchain.tools</span> <span class="import">import</span> <span class="function">DuckDuckGoSearchRun</span></div>
+<div class="code-line" data-line="3"><span class="import">from</span> <span class="string">langchain.agents</span> <span class="import">import</span> <span class="function">create_openai_tools_agent</span></div>
+<div class="code-line" data-line="4"></div>
+<div class="code-line" data-line="5"><span class="comment"># Tools for customer service</span></div>
+<div class="code-line" data-line="6"><span class="variable">tools</span> <span class="operator">=</span> [</div>
+<div class="code-line" data-line="7">    <span class="function">WikipediaQueryRun</span>(),           <span class="comment"># For product information</span></div>
+<div class="code-line" data-line="8">    <span class="function">DuckDuckGoSearchRun</span>(),         <span class="comment"># For current information</span></div>
+<div class="code-line" data-line="9">    <span class="comment"># EmailTool(),                 # Send emails (custom)</span></div>
+<div class="code-line" data-line="10">    <span class="comment"># DatabaseTool(),              # Check orders (custom)</span></div>
+<div class="code-line" data-line="11">]</div>
+<div class="code-line" data-line="12"></div>
+<div class="code-line" data-line="13"><span class="comment"># Create specialized customer service agent</span></div>
+<div class="code-line" data-line="14"><span class="variable">agent</span> <span class="operator">=</span> <span class="function">create_openai_tools_agent</span>(</div>
+<div class="code-line" data-line="15">    <span class="variable">llm</span>=<span class="function">ChatOpenAI</span>(<span class="variable">model</span>=<span class="string">"gpt-4"</span>),</div>
+<div class="code-line" data-line="16">    <span class="variable">tools</span>=<span class="variable">tools</span>,</div>
+<div class="code-line" data-line="17">    <span class="variable">prompt</span>=<span class="string">"You are a helpful customer service agent..."</span></div>
+<div class="code-line" data-line="18">)</div>
+<div class="code-line" data-line="19"></div>
+<div class="code-line" data-line="20"><span class="variable">executor</span> <span class="operator">=</span> <span class="function">AgentExecutor</span>(<span class="variable">agent</span>=<span class="variable">agent</span>, <span class="variable">tools</span>=<span class="variable">tools</span>)</div>
+<div class="code-line" data-line="21"></div>
+<div class="code-line" data-line="22"><span class="comment"># Handle customer query</span></div>
+<div class="code-line" data-line="23"><span class="variable">response</span> <span class="operator">=</span> <span class="variable">executor</span>.<span class="function">invoke</span>({</div>
+<div class="code-line" data-line="24">    <span class="string">"input"</span>: <span class="string">"I need help with my order #12345"</span></div>
+<div class="code-line" data-line="25">})</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tips-box">
+                <div class="tips-title">💡 LangChain Best Practices</div>
+                <ul>
+                    <li>🎯 <strong>Start Simple:</strong> Begin with 1-2 tools, add more gradually</li>
+                    <li>🔧 <strong>Tool Selection:</strong> Choose tools that complement each other</li>
+                    <li>📝 <strong>Clear Prompts:</strong> Be specific about what you want the agent to do</li>
+                    <li>🔄 <strong>Error Handling:</strong> Always plan for when tools fail</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- LangGraph Session -->
+        <div id="langgraph" class="session-content">
+            <h2>📊 LangGraph: Smart Decision Making</h2>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    🧠 Think of LangGraph as a Smart Brain
+                </div>
+                <p>LangGraph creates agents that can make decisions, loop back, try different approaches, and handle complex workflows. Perfect when you need conditional logic and multi-step reasoning.</p>
+            </div>
+
+            <div class="architecture-diagram">
+                <h3>🔄 LangGraph Flow Example - Smart Decision Making</h3>
+                <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); padding: 30px; border-radius: 15px; margin: 20px 0; border: 2px solid #6c5ce7;">
+                    
+                    <!-- Simple Explanation First -->
+                    <div style="text-align: center; margin-bottom: 30px; background: white; padding: 20px; border-radius: 10px; border-left: 5px solid #6c5ce7;">
+                        <h4 style="color: #4c3d99; margin-bottom: 15px;">🤔 Think of LangGraph Like a Smart GPS</h4>
+                        <p style="margin: 0; font-size: 1.1em; color: #2c3e50;">
+                            A regular GPS always takes the same route. A smart GPS looks at traffic, weather, and road conditions, then chooses the BEST path for right now!
+                        </p>
+                    </div>
+
+                    <!-- Interactive Example -->
+                    <div style="background: white; padding: 25px; border-radius: 12px; margin: 20px 0;">
+                        <h4 style="color: #2c3e50; text-align: center; margin-bottom: 20px;">📱 Real Example: "Make my home comfortable"</h4>
+                        
+                        <!-- Step-by-step flow -->
+                        <div style="display: flex; flex-direction: column; gap: 15px;">
+                            
+                            <!-- Step 1: Input -->
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <div style="background: #e3f2fd; color: #1976d2; padding: 15px 20px; border-radius: 10px; font-weight: bold; min-width: 200px; text-align: center;">
+                                    📝 "Make home comfortable"
+                                </div>
+                                <div style="color: #666; font-style: italic;">User says this...</div>
+                            </div>
+
+                            <div style="text-align: center; font-size: 24px; color: #6c5ce7;">↓</div>
+
+                            <!-- Step 2: Smart Analysis -->
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <div style="background: #f3e5f5; color: #7b1fa2; padding: 15px 20px; border-radius: 10px; font-weight: bold; min-width: 200px; text-align: center;">
+                                    🧠 Smart Analysis
+                                </div>
+                                <div style="background: #fff3e0; padding: 10px 15px; border-radius: 8px; flex: 1;">
+                                    Agent thinks: "Let me check... It's 8 PM, cold outside, user just got home from work"
+                                </div>
+                            </div>
+
+                            <div style="text-align: center; font-size: 24px; color: #6c5ce7;">↓</div>
+
+                            <!-- Step 3: Decision Point -->
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <div style="background: #fff3e0; color: #f57c00; padding: 15px 20px; border-radius: 10px; font-weight: bold; min-width: 200px; text-align: center;">
+                                    🤔 Smart Decision
+                                </div>
+                                <div style="background: #e8f5e8; padding: 10px 15px; border-radius: 8px; flex: 1;">
+                                    "Evening + Cold + Just got home = Need COZY mode!"
+                                </div>
+                            </div>
+
+                            <div style="display: flex; justify-content: center; gap: 30px; margin: 20px 0;">
+                                <div style="text-align: center; color: #6c5ce7; font-size: 18px;">↙</div>
+                                <div style="text-align: center; color: #6c5ce7; font-size: 18px;">↓</div>
+                                <div style="text-align: center; color: #6c5ce7; font-size: 18px;">↘</div>
+                            </div>
+
+                            <!-- Step 4: Multiple Actions -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin: 20px 0;">
+                                <div style="background: #e8f5e8; color: #388e3c; padding: 15px; border-radius: 10px; text-align: center; font-weight: bold;">
+                                    💡 Lights<br>
+                                    <small style="font-weight: normal;">Dim to 30%</small>
+                                </div>
+                                <div style="background: #e8f5e8; color: #388e3c; padding: 15px; border-radius: 10px; text-align: center; font-weight: bold;">
+                                    🌡️ Heat<br>
+                                    <small style="font-weight: normal;">Warm to 72°F</small>
+                                </div>
+                                <div style="background: #e8f5e8; color: #388e3c; padding: 15px; border-radius: 10px; text-align: center; font-weight: bold;">
+                                    🎵 Music<br>
+                                    <small style="font-weight: normal;">Play relaxing</small>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; justify-content: center; gap: 30px; margin: 20px 0;">
+                                <div style="text-align: center; color: #6c5ce7; font-size: 18px;">↘</div>
+                                <div style="text-align: center; color: #6c5ce7; font-size: 18px;">↓</div>
+                                <div style="text-align: center; color: #6c5ce7; font-size: 18px;">↙</div>
+                            </div>
+
+                            <!-- Step 5: Result -->
+                            <div style="display: flex; align-items: center; gap: 15px;">
+                                <div style="background: #e8f5e8; color: #388e3c; padding: 15px 20px; border-radius: 10px; font-weight: bold; min-width: 200px; text-align: center;">
+                                    ✅ Perfect Result!
+                                </div>
+                                <div style="background: #f0f8f0; padding: 10px 15px; border-radius: 8px; flex: 1;">
+                                    "Your home is now cozy and perfect for relaxing after work! 🏠✨"
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Comparison with Simple Approach -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 25px;">
+                        
+                        <!-- Simple Agent -->
+                        <div style="background: #ffebee; padding: 20px; border-radius: 12px; border-left: 5px solid #f44336;">
+                            <h4 style="color: #d32f2f; margin-bottom: 15px; text-align: center;">❌ Simple Agent (Boring)</h4>
+                            <div style="text-align: center; color: #666; margin-bottom: 15px;">Always does the same thing:</div>
+                            <div style="background: white; padding: 15px; border-radius: 8px;">
+                                "Make comfortable" →<br>
+                                Turn lights to 50%<br>
+                                Set temp to 70°F<br>
+                                Done.
+                            </div>
+                            <div style="text-align: center; color: #d32f2f; margin-top: 10px; font-size: 0.9em;">
+                                Same result every time, regardless of situation
+                            </div>
+                        </div>
+
+                        <!-- Smart Agent -->
+                        <div style="background: #e8f5e8; padding: 20px; border-radius: 12px; border-left: 5px solid #4caf50;">
+                            <h4 style="color: #388e3c; margin-bottom: 15px; text-align: center;">✅ LangGraph Agent (Smart!)</h4>
+                            <div style="text-align: center; color: #666; margin-bottom: 15px;">Thinks about the situation:</div>
+                            <div style="background: white; padding: 15px; border-radius: 8px;">
+                                "Make comfortable" →<br>
+                                Check time & weather →<br>
+                                Choose perfect mode →<br>
+                                Execute smart actions
+                            </div>
+                            <div style="text-align: center; color: #388e3c; margin-top: 10px; font-size: 0.9em;">
+                                Different results based on what you actually need!
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Key Benefits -->
+                    <div style="background: linear-gradient(135deg, #6c5ce7 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; margin-top: 25px; text-align: center;">
+                        <h4 style="color: white; margin-bottom: 15px;">🎯 Why LangGraph is Amazing</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px;">
+                            <div>
+                                <div style="font-size: 2em; margin-bottom: 8px;">🧠</div>
+                                <strong>Thinks First</strong><br>
+                                <small>Analyzes situation before acting</small>
+                            </div>
+                            <div>
+                                <div style="font-size: 2em; margin-bottom: 8px;">🎯</div>
+                                <strong>Perfect Choices</strong><br>
+                                <small>Picks the best action for right now</small>
+                            </div>
+                            <div>
+                                <div style="font-size: 2em; margin-bottom: 8px;">🔄</div>
+                                <strong>Adapts & Learns</strong><br>
+                                <small>Gets better at helping you</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="code-example">
+                <div class="code-title">🎯 Simple LangGraph Agent</div>
+                <div class="code-content">
+<div class="code-line" data-line="1"><span class="import">from</span> <span class="string">langgraph.graph</span> <span class="import">import</span> <span class="function">StateGraph</span>, <span class="variable">END</span></div>
+<div class="code-line" data-line="2"><span class="import">from</span> <span class="string">langchain_openai</span> <span class="import">import</span> <span class="function">ChatOpenAI</span></div>
+<div class="code-line" data-line="3"></div>
+<div class="code-line" data-line="4"><span class="comment"># 1. Define what information the agent remembers</span></div>
+<div class="code-line" data-line="5"><span class="keyword">class</span> <span class="function">AgentState</span>(<span class="function">TypedDict</span>):</div>
+<div class="code-line" data-line="6">    <span class="variable">messages</span>: <span class="function">List</span>[<span class="keyword">str</span>]</div>
+<div class="code-line" data-line="7">    <span class="variable">next_action</span>: <span class="keyword">str</span></div>
+<div class="code-line" data-line="8">    <span class="variable">result</span>: <span class="keyword">str</span></div>
+<div class="code-line" data-line="9"></div>
+<div class="code-line" data-line="10"><span class="comment"># 2. Create the decision logic</span></div>
+<div class="code-line" data-line="11"><span class="keyword">def</span> <span class="function">should_continue</span>(<span class="variable">state</span>):</div>
+<div class="code-line" data-line="12">    <span class="keyword">if</span> <span class="string">"search"</span> <span class="keyword">in</span> <span class="variable">state</span>[<span class="string">"messages"</span>][-1].<span class="function">lower</span>():</div>
+<div class="code-line" data-line="13">        <span class="keyword">return</span> <span class="string">"search_tool"</span></div>
+<div class="code-line" data-line="14">    <span class="keyword">elif</span> <span class="string">"calculate"</span> <span class="keyword">in</span> <span class="variable">state</span>[<span class="string">"messages"</span>][-1].<span class="function">lower</span>():</div>
+<div class="code-line" data-line="15">        <span class="keyword">return</span> <span class="string">"math_tool"</span></div>
+<div class="code-line" data-line="16">    <span class="keyword">else</span>:</div>
+<div class="code-line" data-line="17">        <span class="keyword">return</span> <span class="variable">END</span></div>
+<div class="code-line" data-line="18"></div>
+<div class="code-line" data-line="19"><span class="comment"># 3. Build the graph</span></div>
+<div class="code-line" data-line="20"><span class="variable">workflow</span> <span class="operator">=</span> <span class="function">StateGraph</span>(<span class="variable">AgentState</span>)</div>
+<div class="code-line" data-line="21"><span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"analyze"</span>, <span class="variable">analyze_input</span>)</div>
+<div class="code-line" data-line="22"><span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"search_tool"</span>, <span class="variable">search_function</span>)</div>
+<div class="code-line" data-line="23"><span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"math_tool"</span>, <span class="variable">calculate_function</span>)</div>
+<div class="code-line" data-line="24"></div>
+<div class="code-line" data-line="25"><span class="comment"># 4. Connect the nodes</span></div>
+<div class="code-line" data-line="26"><span class="variable">workflow</span>.<span class="function">add_edge</span>(<span class="string">"analyze"</span>, <span class="variable">should_continue</span>)</div>
+<div class="code-line" data-line="27"><span class="variable">workflow</span>.<span class="function">set_entry_point</span>(<span class="string">"analyze"</span>)</div>
+<div class="code-line" data-line="28"></div>
+<div class="code-line" data-line="29"><span class="comment"># 5. Compile the agent</span></div>
+<div class="code-line" data-line="30"><span class="variable">agent</span> <span class="operator">=</span> <span class="variable">workflow</span>.<span class="function">compile</span>()</div>
+                </div>
+            </div>
+
+            <div class="interactive-demo">
+                <h3>🎮 Interactive Demo: LangGraph Agent</h3>
+                <div class="demo-controls">
+                    <button class="demo-btn" onclick="runLangGraphDemo('research')">🔬 Research Flow</button>
+                    <button class="demo-btn" onclick="runLangGraphDemo('decision')">🤔 Decision Tree</button>
+                    <button class="demo-btn" onclick="runLangGraphDemo('loop')">🔄 Loop Example</button>
+                </div>
+                <div class="demo-output" id="langgraphOutput">Click a demo button to see LangGraph decision making!</div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    🎯 Real Example: Research Assistant
+                </div>
+                <div class="code-example">
+                    <div class="code-title">🔬 Smart Research Agent</div>
+                    <div class="code-content">
+<div class="code-line" data-line="1"><span class="comment"># Research agent that can:</span></div>
+<div class="code-line" data-line="2"><span class="comment"># 1. Search for information</span></div>
+<div class="code-line" data-line="3"><span class="comment"># 2. Validate sources</span></div>
+<div class="code-line" data-line="4"><span class="comment"># 3. Synthesize findings</span></div>
+<div class="code-line" data-line="5"><span class="comment"># 4. Ask for more info if needed</span></div>
+<div class="code-line" data-line="6"></div>
+<div class="code-line" data-line="7"><span class="keyword">class</span> <span class="function">ResearchState</span>(<span class="function">TypedDict</span>):</div>
+<div class="code-line" data-line="8">    <span class="variable">query</span>: <span class="keyword">str</span></div>
+<div class="code-line" data-line="9">    <span class="variable">sources</span>: <span class="function">List</span>[<span class="keyword">str</span>]</div>
+<div class="code-line" data-line="10">    <span class="variable">confidence</span>: <span class="keyword">float</span></div>
+<div class="code-line" data-line="11">    <span class="variable">final_answer</span>: <span class="keyword">str</span></div>
+<div class="code-line" data-line="12"></div>
+<div class="code-line" data-line="13"><span class="keyword">def</span> <span class="function">research_workflow</span>():</div>
+<div class="code-line" data-line="14">    <span class="comment"># Decision making logic</span></div>
+<div class="code-line" data-line="15">    <span class="keyword">def</span> <span class="function">should_continue</span>(<span class="variable">state</span>):</div>
+<div class="code-line" data-line="16">        <span class="keyword">if</span> <span class="variable">state</span>[<span class="string">"confidence"</span>] < 0.7:</div>
+<div class="code-line" data-line="17">            <span class="keyword">return</span> <span class="string">"search_more"</span></div>
+<div class="code-line" data-line="18">        <span class="keyword">else</span>:</div>
+<div class="code-line" data-line="19">            <span class="keyword">return</span> <span class="string">"synthesize"</span></div>
+<div class="code-line" data-line="20">    </div>
+<div class="code-line" data-line="21">    <span class="comment"># Build the intelligent workflow</span></div>
+<div class="code-line" data-line="22">    <span class="variable">workflow</span> <span class="operator">=</span> <span class="function">StateGraph</span>(<span class="variable">ResearchState</span>)</div>
+<div class="code-line" data-line="23">    </div>
+<div class="code-line" data-line="24">    <span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"search"</span>, <span class="variable">search_sources</span>)</div>
+<div class="code-line" data-line="25">    <span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"validate"</span>, <span class="variable">validate_sources</span>)  </div>
+<div class="code-line" data-line="26">    <span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"synthesize"</span>, <span class="variable">create_answer</span>)</div>
+<div class="code-line" data-line="27">    </div>
+<div class="code-line" data-line="28">    <span class="comment"># Smart routing based on confidence</span></div>
+<div class="code-line" data-line="29">    <span class="variable">workflow</span>.<span class="function">add_conditional_edges</span>(</div>
+<div class="code-line" data-line="30">        <span class="string">"validate"</span>,</div>
+<div class="code-line" data-line="31">        <span class="variable">should_continue</span>,</div>
+<div class="code-line" data-line="32">        {</div>
+<div class="code-line" data-line="33">            <span class="string">"search_more"</span>: <span class="string">"search"</span>,</div>
+<div class="code-line" data-line="34">            <span class="string">"synthesize"</span>: <span class="string">"synthesize"</span></div>
+<div class="code-line" data-line="35">        }</div>
+<div class="code-line" data-line="36">    )</div>
+<div class="code-line" data-line="37">    </div>
+<div class="code-line" data-line="38">    <span class="keyword">return</span> <span class="variable">workflow</span>.<span class="function">compile</span>()</div>
+<div class="code-line" data-line="39"></div>
+<div class="code-line" data-line="40"><span class="comment"># The agent will automatically loop until confident!</span></div>
+<div class="code-line" data-line="41"><span class="variable">agent</span> <span class="operator">=</span> <span class="function">research_workflow</span>()</div>
+<div class="code-line" data-line="42"><span class="variable">result</span> <span class="operator">=</span> <span class="variable">agent</span>.<span class="function">invoke</span>({<span class="string">"query"</span>: <span class="string">"What are the latest AI trends?"</span>})</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tips-box">
+                <div class="tips-title">💡 LangGraph Advantages</div>
+                <ul>
+                    <li>🔄 <strong>Loops & Conditions:</strong> Agent can retry and adapt</li>
+                    <li>🧠 <strong>Memory:</strong> Remembers state across multiple steps</li>
+                    <li>🌳 <strong>Decision Trees:</strong> Complex branching logic</li>
+                    <li>⚡ <strong>Performance:</strong> Only runs necessary steps</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Building Session -->
+        <div id="building" class="session-content">
+            <h2>🛠️ Building Your First Agent</h2>
+
+            <div class="step-indicator">
+                <div class="step completed">1</div>
+                <div class="step completed">2</div>
+                <div class="step completed">3</div>
+                <div class="step active">4</div>
+                <div class="step">5</div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    🎯 Let's Build: Personal Assistant Agent
+                </div>
+                <p>We'll create an agent that can help with daily tasks: checking weather, managing calendar, sending emails, and making decisions.</p>
+            </div>
+
+            <div class="code-example">
+                <div class="code-title">📋 Step 1: Define Your Tools</div>
+                <div class="code-content">
+<div class="code-line" data-line="1"><span class="comment"># First, let's create simple tools our agent can use</span></div>
+<div class="code-line" data-line="2"></div>
+<div class="code-line" data-line="3"><span class="keyword">def</span> <span class="function">get_weather</span>(<span class="variable">city</span>: <span class="keyword">str</span>) -> <span class="keyword">str</span>:</div>
+<div class="code-line" data-line="4">    <span class="string">"""Get weather information for a city"""</span></div>
+<div class="code-line" data-line="5">    <span class="comment"># In real life, this would call a weather API</span></div>
+<div class="code-line" data-line="6">    <span class="variable">weather_data</span> <span class="operator">=</span> {</div>
+<div class="code-line" data-line="7">        <span class="string">"New York"</span>: <span class="string">"Sunny, 72°F"</span>,</div>
+<div class="code-line" data-line="8">        <span class="string">"London"</span>: <span class="string">"Rainy, 15°C"</span>, </div>
+<div class="code-line" data-line="9">        <span class="string">"Tokyo"</span>: <span class="string">"Cloudy, 25°C"</span></div>
+<div class="code-line" data-line="10">    }</div>
+<div class="code-line" data-line="11">    <span class="keyword">return</span> <span class="variable">weather_data</span>.<span class="function">get</span>(<span class="variable">city</span>, <span class="string">"Weather unknown for this city"</span>)</div>
+<div class="code-line" data-line="12"></div>
+<div class="code-line" data-line="13"><span class="keyword">def</span> <span class="function">send_email</span>(<span class="variable">to</span>: <span class="keyword">str</span>, <span class="variable">subject</span>: <span class="keyword">str</span>, <span class="variable">body</span>: <span class="keyword">str</span>) -> <span class="keyword">str</span>:</div>
+<div class="code-line" data-line="14">    <span class="string">"""Send an email"""</span></div>
+<div class="code-line" data-line="15">    <span class="comment"># In real life, this would send actual email</span></div>
+<div class="code-line" data-line="16">    <span class="keyword">return</span> <span class="string">f"Email sent to {to} with subject '{subject}'"</span></div>
+<div class="code-line" data-line="17"></div>
+<div class="code-line" data-line="18"><span class="keyword">def</span> <span class="function">check_calendar</span>(<span class="variable">date</span>: <span class="keyword">str</span>) -> <span class="keyword">str</span>:</div>
+<div class="code-line" data-line="19">    <span class="string">"""Check calendar for a specific date"""</span></div>
+<div class="code-line" data-line="20">    <span class="comment"># In real life, this would check real calendar</span></div>
+<div class="code-line" data-line="21">    <span class="keyword">return</span> <span class="string">f"You have 3 meetings scheduled for {date}"</span></div>
+<div class="code-line" data-line="22"></div>
+<div class="code-line" data-line="23"><span class="comment"># Convert functions to LangChain tools</span></div>
+<div class="code-line" data-line="24"><span class="import">from</span> <span class="string">langchain.tools</span> <span class="import">import</span> <span class="variable">tool</span></div>
+<div class="code-line" data-line="25"></div>
+<div class="code-line" data-line="26"><span class="variable">@tool</span></div>
+<div class="code-line" data-line="27"><span class="keyword">def</span> <span class="function">weather_tool</span>(<span class="variable">city</span>: <span class="keyword">str</span>) -> <span class="keyword">str</span>:</div>
+<div class="code-line" data-line="28">    <span class="string">"""Get current weather for a city"""</span></div>
+<div class="code-line" data-line="29">    <span class="keyword">return</span> <span class="function">get_weather</span>(<span class="variable">city</span>)</div>
+<div class="code-line" data-line="30"></div>
+<div class="code-line" data-line="31"><span class="variable">@tool</span>  </div>
+<div class="code-line" data-line="32"><span class="keyword">def</span> <span class="function">email_tool</span>(<span class="variable">to</span>: <span class="keyword">str</span>, <span class="variable">subject</span>: <span class="keyword">str</span>, <span class="variable">body</span>: <span class="keyword">str</span>) -> <span class="keyword">str</span>:</div>
+<div class="code-line" data-line="33">    <span class="string">"""Send an email to someone"""</span></div>
+<div class="code-line" data-line="34">    <span class="keyword">return</span> <span class="function">send_email</span>(<span class="variable">to</span>, <span class="variable">subject</span>, <span class="variable">body</span>)</div>
+<div class="code-line" data-line="35"></div>
+<div class="code-line" data-line="36"><span class="variable">@tool</span></div>
+<div class="code-line" data-line="37"><span class="keyword">def</span> <span class="function">calendar_tool</span>(<span class="variable">date</span>: <span class="keyword">str</span>) -> <span class="keyword">str</span>:</div>
+<div class="code-line" data-line="38">    <span class="string">"""Check calendar for a date"""</span></div>
+<div class="code-line" data-line="39">    <span class="keyword">return</span> <span class="function">check_calendar</span>(<span class="variable">date</span>)</div>
+                </div>
+            </div>
+
+            <div class="code-example">
+                <div class="code-title">🤖 Step 2: Create the Agent (Choose Your Approach)</div>
+                <div class="code-content">
+<div class="code-line" data-line="1"><span class="comment"># Option A: Simple LangChain Agent</span></div>
+<div class="code-line" data-line="2"><span class="import">from</span> <span class="string">langchain.agents</span> <span class="import">import</span> <span class="function">create_openai_tools_agent</span>, <span class="function">AgentExecutor</span></div>
+<div class="code-line" data-line="3"><span class="import">from</span> <span class="string">langchain_openai</span> <span class="import">import</span> <span class="function">ChatOpenAI</span></div>
+<div class="code-line" data-line="4"></div>
+<div class="code-line" data-line="5"><span class="keyword">def</span> <span class="function">create_simple_assistant</span>():</div>
+<div class="code-line" data-line="6">    <span class="variable">llm</span> <span class="operator">=</span> <span class="function">ChatOpenAI</span>(<span class="variable">model</span>=<span class="string">"gpt-4"</span>)</div>
+<div class="code-line" data-line="7">    <span class="variable">tools</span> <span class="operator">=</span> [<span class="variable">weather_tool</span>, <span class="variable">email_tool</span>, <span class="variable">calendar_tool</span>]</div>
+<div class="code-line" data-line="8">    </div>
+<div class="code-line" data-line="9">    <span class="variable">prompt</span> <span class="operator">=</span> <span class="string">"""You are a helpful personal assistant. 
+    You can check weather, send emails, and check calendars.
+    Always be friendly and helpful!"""</span></div>
+<div class="code-line" data-line="12">    </div>
+<div class="code-line" data-line="13">    <span class="variable">agent</span> <span class="operator">=</span> <span class="function">create_openai_tools_agent</span>(<span class="variable">llm</span>, <span class="variable">tools</span>, <span class="variable">prompt</span>)</div>
+<div class="code-line" data-line="14">    <span class="keyword">return</span> <span class="function">AgentExecutor</span>(<span class="variable">agent</span>=<span class="variable">agent</span>, <span class="variable">tools</span>=<span class="variable">tools</span>)</div>
+<div class="code-line" data-line="15"></div>
+<div class="code-line" data-line="16"><span class="comment"># Option B: Smart LangGraph Agent  </span></div>
+<div class="code-line" data-line="17"><span class="import">from</span> <span class="string">langgraph.graph</span> <span class="import">import</span> <span class="function">StateGraph</span>, <span class="variable">END</span></div>
+<div class="code-line" data-line="18"></div>
+<div class="code-line" data-line="19"><span class="keyword">class</span> <span class="function">AssistantState</span>(<span class="function">TypedDict</span>):</div>
+<div class="code-line" data-line="20">    <span class="variable">messages</span>: <span class="function">List</span>[<span class="keyword">str</span>]</div>
+<div class="code-line" data-line="21">    <span class="variable">task_type</span>: <span class="keyword">str</span></div>
+<div class="code-line" data-line="22">    <span class="variable">result</span>: <span class="keyword">str</span></div>
+<div class="code-line" data-line="23">    <span class="variable">needs_followup</span>: <span class="keyword">bool</span></div>
+<div class="code-line" data-line="24"></div>
+<div class="code-line" data-line="25"><span class="keyword">def</span> <span class="function">create_smart_assistant</span>():</div>
+<div class="code-line" data-line="26">    <span class="keyword">def</span> <span class="function">classify_task</span>(<span class="variable">state</span>):</div>
+<div class="code-line" data-line="27">        <span class="variable">last_message</span> <span class="operator">=</span> <span class="variable">state</span>[<span class="string">"messages"</span>][-1].<span class="function">lower</span>()</div>
+<div class="code-line" data-line="28">        <span class="keyword">if</span> <span class="string">"weather"</span> <span class="keyword">in</span> <span class="variable">last_message</span>:</div>
+<div class="code-line" data-line="29">            <span class="keyword">return</span> <span class="string">"weather"</span></div>
+<div class="code-line" data-line="30">        <span class="keyword">elif</span> <span class="string">"email"</span> <span class="keyword">in</span> <span class="variable">last_message</span>:</div>
+<div class="code-line" data-line="31">            <span class="keyword">return</span> <span class="string">"email"</span>  </div>
+<div class="code-line" data-line="32">        <span class="keyword">elif</span> <span class="string">"calendar"</span> <span class="keyword">in</span> <span class="variable">last_message</span>:</div>
+<div class="code-line" data-line="33">            <span class="keyword">return</span> <span class="string">"calendar"</span></div>
+<div class="code-line" data-line="34">        <span class="keyword">else</span>:</div>
+<div class="code-line" data-line="35">            <span class="keyword">return</span> <span class="string">"general"</span></div>
+<div class="code-line" data-line="36">    </div>
+<div class="code-line" data-line="37">    <span class="variable">workflow</span> <span class="operator">=</span> <span class="function">StateGraph</span>(<span class="variable">AssistantState</span>)</div>
+<div class="code-line" data-line="38">    <span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"classifier"</span>, <span class="variable">classify_task</span>)</div>
+<div class="code-line" data-line="39">    <span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"weather"</span>, <span class="variable">handle_weather</span>)</div>
+<div class="code-line" data-line="40">    <span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"email"</span>, <span class="variable">handle_email</span>)</div>
+<div class="code-line" data-line="41">    <span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"calendar"</span>, <span class="variable">handle_calendar</span>)</div>
+<div class="code-line" data-line="42">    </div>
+<div class="code-line" data-line="43">    <span class="keyword">return</span> <span class="variable">workflow</span>.<span class="function">compile</span>()</div>
+                </div>
+            </div>
+
+            <div class="interactive-demo">
+                <h3>🎮 Test Your Agent</h3>
+                <div class="demo-controls">
+                    <button class="demo-btn" onclick="testAgent('weather')">🌤️ Test Weather</button>
+                    <button class="demo-btn" onclick="testAgent('email')">📧 Test Email</button>
+                    <button class="demo-btn" onclick="testAgent('calendar')">📅 Test Calendar</button>
+                    <button class="demo-btn" onclick="testAgent('complex')">🧠 Complex Task</button>
+                </div>
+                <div class="demo-output" id="agentOutput">Choose a test to see your agent in action!</div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    🚀 Step 3: Make It Production Ready
+                </div>
+                <div class="code-example">
+                    <div class="code-title">⚡ Production Agent Template</div>
+                    <div class="code-content">
+import asyncio
+from typing import Dict, Any
+import logging
+
+class ProductionAgent:
+    def __init__(self):
+        self.llm = ChatOpenAI(model="gpt-4")
+        self.tools = self._setup_tools()
+        self.agent = self._create_agent()
+        self.logger = logging.getLogger(__name__)
+    
+    def _setup_tools(self):
+        """Initialize all tools with error handling"""
+        try:
+            return [weather_tool, email_tool, calendar_tool]
+        except Exception as e:
+            self.logger.error(f"Tool setup failed: {e}")
+            return []
+    
+    async def process_request(self, user_input: str) -> Dict[str, Any]:
+        """Process user request with full error handling"""
+        try:
+            # Log the request
+            self.logger.info(f"Processing: {user_input}")
+            
+            # Execute with timeout
+            result = await asyncio.wait_for(
+                self.agent.ainvoke({"input": user_input}),
+                timeout=30.0
+            )
+            
+            return {
+                "success": True,
+                "result": result["output"],
+                "timestamp": datetime.now().isoformat()
+            }
+            
+        except asyncio.TimeoutError:
+            return {"success": False, "error": "Request timed out"}
+        except Exception as e:
+            self.logger.error(f"Request failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    def health_check(self) -> bool:
+        """Check if agent is working properly"""
+        try:
+            test_result = self.agent.invoke({"input": "Hello"})
+            return "hello" in test_result["output"].lower()
+        except:
+            return False
+
+# Usage
+agent = ProductionAgent()
+result = await agent.process_request("What's the weather in Tokyo?")
+                    </div>
+                </div>
+            </div>
+
+            <div class="tips-box">
+                <div class="tips-title">💡 Building Best Practices</div>
+                <ul>
+                    <li>🧪 <strong>Test Early:</strong> Test each tool individually before combining</li>
+                    <li>🛡️ <strong>Error Handling:</strong> Always plan for API failures and timeouts</li>
+                    <li>📊 <strong>Logging:</strong> Log everything for debugging and monitoring</li>
+                    <li>⚡ <strong>Performance:</strong> Set timeouts and limit tool usage</li>
+                    <li>🔐 <strong>Security:</strong> Validate inputs and secure API keys</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Advanced Session -->
+        <div id="advanced" class="session-content">
+            <h2>🚀 Advanced Agent Patterns</h2>
+
+            <div class="step-indicator">
+                <div class="step completed">1</div>
+                <div class="step completed">2</div>
+                <div class="step completed">3</div>
+                <div class="step completed">4</div>
+                <div class="step active">5</div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    🏢 Multi-Agent Systems
+                </div>
+                <p>Instead of one super-agent, create specialized agents that work together. Like having a team of experts!</p>
+            </div>
+
+            <div class="code-example">
+                <div class="code-title">👥 Team of Agents</div>
+                <div class="code-content">
+class AgentTeam:
+    def __init__(self):
+        # Specialized agents for different domains
+        self.research_agent = self._create_research_agent()
+        self.writing_agent = self._create_writing_agent()
+        self.review_agent = self._create_review_agent()
+        self.coordinator = self._create_coordinator()
+    
+    async def handle_complex_task(self, task: str):
+        """Coordinate multiple agents for complex tasks"""
+        
+        # Step 1: Coordinator decides what agents are needed
+        plan = await self.coordinator.invoke({
+            "input": f"Plan how to handle: {task}"
+        })
+        
+        # Step 2: Execute plan with appropriate agents
+        if "research" in plan["output"].lower():
+            research = await self.research_agent.invoke({"input": task})
+            
+        if "write" in plan["output"].lower():
+            content = await self.writing_agent.invoke({
+                "input": task,
+                "research_data": research["output"]
+            })
+            
+        if "review" in plan["output"].lower():
+            final = await self.review_agent.invoke({
+                "input": content["output"]
+            })
+            
+        return final
+
+# Example usage
+team = AgentTeam()
+result = await team.handle_complex_task(
+    "Write a comprehensive report on AI trends with sources"
+)
+                </div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    🧠 Memory & Learning
+                </div>
+                <p>Make your agents remember past conversations and learn from interactions.</p>
+            </div>
+
+            <div class="code-example">
+                <div class="code-title">💭 Agent with Memory</div>
+                <div class="code-content">
+from langchain.memory import ConversationBufferWindowMemory
+from langchain.schema import BaseMessage
+
+class MemoryAgent:
+    def __init__(self):
+        # Remember last 10 interactions
+        self.memory = ConversationBufferWindowMemory(
+            k=10,
+            return_messages=True
+        )
+        
+        # Long-term preferences storage
+        self.user_preferences = {}
+        
+        # Learning from interactions
+        self.success_patterns = []
+        self.failure_patterns = []
+    
+    async def chat(self, user_input: str, user_id: str):
+        """Chat with memory and learning"""
+        
+        # Get conversation history
+        history = self.memory.chat_memory.messages
+        
+        # Get user preferences
+        preferences = self.user_preferences.get(user_id, {})
+        
+        # Create context-aware prompt
+        full_context = f"""
+        User preferences: {preferences}
+        Recent conversation: {history[-3:] if history else "None"}
+        New message: {user_input}
+        """
+        
+        # Process with full context
+        response = await self.agent.ainvoke({"input": full_context})
+        
+        # Save to memory
+        self.memory.save_context(
+            {"input": user_input},
+            {"output": response["output"]}
+        )
+        
+        # Learn from interaction
+        await self._learn_from_interaction(user_input, response["output"])
+        
+        return response["output"]
+    
+    async def _learn_from_interaction(self, input_msg, output_msg):
+        """Learn patterns from successful interactions"""
+        # Simple learning: track what works
+        if any(word in output_msg.lower() for word in ["thank", "great", "perfect"]):
+            self.success_patterns.append({
+                "input_pattern": input_msg.lower(),
+                "successful_response": output_msg
+            })
+                </div>
+            </div>
+
+            <div class="interactive-demo">
+                <h3>🎮 Advanced Agent Demo</h3>
+                <div class="demo-controls">
+                    <button class="demo-btn" onclick="runAdvancedDemo('multiagent')">👥 Multi-Agent</button>
+                    <button class="demo-btn" onclick="runAdvancedDemo('memory')">💭 Memory Demo</button>
+                    <button class="demo-btn" onclick="runAdvancedDemo('learning')">🧠 Learning Demo</button>
+                </div>
+                <div class="demo-output" id="advancedOutput">Explore advanced agent capabilities!</div>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    🔄 Self-Improving Agents
+                </div>
+                <div class="code-example">
+                    <div class="code-title">📈 Agent That Improves Itself</div>
+                    <div class="code-content">
+class SelfImprovingAgent:
+    def __init__(self):
+        self.performance_metrics = {}
+        self.improvement_history = []
+        
+    async def execute_with_improvement(self, task: str):
+        """Execute task and learn from performance"""
+        
+        start_time = time.time()
+        
+        # Try current approach
+        result = await self.agent.ainvoke({"input": task})
+        
+        # Measure performance
+        execution_time = time.time() - start_time
+        success = await self._evaluate_success(result["output"])
+        
+        # Record metrics
+        self.performance_metrics[task] = {
+            "execution_time": execution_time,
+            "success": success,
+            "timestamp": datetime.now()
+        }
+        
+        # Improve if needed
+        if not success:
+            improved_result = await self._try_improvement(task, result)
+            return improved_result
+            
+        return result["output"]
+    
+    async def _try_improvement(self, task: str, failed_result: dict):
+        """Try different approaches when first attempt fails"""
+        
+        # Strategy 1: Break down complex tasks
+        if len(task.split()) > 10:
+            subtasks = await self._break_down_task(task)
+            results = []
+            for subtask in subtasks:
+                result = await self.agent.ainvoke({"input": subtask})
+                results.append(result["output"])
+            return self._combine_results(results)
+        
+        # Strategy 2: Use different prompt approach
+        alternative_prompt = f"Let me approach this differently: {task}"
+        return await self.agent.ainvoke({"input": alternative_prompt})
+                    </div>
+                </div>
+            </div>
+
+            <div class="tips-box">
+                <div class="tips-title">💡 Advanced Tips</div>
+                <ul>
+                    <li>🎯 <strong>Specialization:</strong> Create focused agents rather than one super-agent</li>
+                    <li>💭 <strong>Context Management:</strong> Balance memory size with performance</li>
+                    <li>📊 <strong>Metrics:</strong> Track success rates and improvement over time</li>
+                    <li>🔄 <strong>Feedback Loops:</strong> Always learn from both successes and failures</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Practice Session -->
+        <div id="practice" class="session-content">
+            <h2>💻 Hands-on Practice Lab</h2>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    🎯 Your Mission: Build a Smart Home Assistant
+                </div>
+                <p>Let's put everything together! You'll build an agent that can control smart home devices, check weather, manage schedules, and make intelligent decisions.</p>
+            </div>
+
+            <!-- Simple Explanation Section -->
+            <div style="background: linear-gradient(135deg, #e8f5e8 0%, #f0f8f0 100%); border: 2px solid #28a745; border-radius: 15px; padding: 30px; margin: 25px 0;">
+                <h3 style="color: #155724; text-align: center; margin-bottom: 25px;">🎓 Understanding LangChain vs LangGraph (Simple Explanation)</h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin: 20px 0;">
+                    
+                    <!-- LangChain Explanation -->
+                    <div style="background: white; padding: 25px; border-radius: 12px; border-left: 5px solid #ffc107;">
+                        <h4 style="color: #856404; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                            🔗 LangChain = Recipe Following
+                        </h4>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <strong>Think of it like following a cooking recipe:</strong>
+                            <ol style="margin: 10px 0; padding-left: 20px; line-height: 1.6;">
+                                <li>🥕 Get ingredients (tools)</li>
+                                <li>🔥 Heat the pan (setup agent)</li>
+                                <li>🍳 Cook step by step (execute in order)</li>
+                                <li>🍽️ Serve the dish (return result)</li>
+                            </ol>
+                        </div>
+
+                        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                            <strong>Real Example:</strong><br>
+                            User: "Check weather and send email"<br><br>
+                            <span style="color: #856404;">Step 1:</span> Use weather tool → "Sunny, 75°F"<br>
+                            <span style="color: #856404;">Step 2:</span> Use email tool → "Email sent!"<br>
+                            <span style="color: #856404;">Done!</span> Simple and predictable
+                        </div>
+                        
+                        <div style="text-align: center; color: #856404; font-weight: bold; margin-top: 15px;">
+                            ✅ Perfect for: Simple tasks, quick results, learning basics
+                        </div>
+                    </div>
+
+                    <!-- LangGraph Explanation -->
+                    <div style="background: white; padding: 25px; border-radius: 12px; border-left: 5px solid #6c5ce7;">
+                        <h4 style="color: #4c3d99; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                            📊 LangGraph = Smart Chef
+                        </h4>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <strong>Think of it like a smart chef who adapts:</strong>
+                            <ol style="margin: 10px 0; padding-left: 20px; line-height: 1.6;">
+                                <li>🤔 Look at what's available</li>
+                                <li>📋 Decide what to cook based on situation</li>
+                                <li>🔄 Adjust recipe if something goes wrong</li>
+                                <li>✨ Create something amazing and personalized</li>
+                            </ol>
+                        </div>
+
+                        <div style="background: #e8e5ff; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                            <strong>Real Example:</strong><br>
+                            User: "Make my home comfortable"<br><br>
+                            <span style="color: #4c3d99;">Think:</span> What time is it? What's the weather?<br>
+                            <span style="color: #4c3d99;">Decide:</span> Evening + Cold → Warm + Cozy<br>
+                            <span style="color: #4c3d99;">Act:</span> Heat up, dim lights, play music<br>
+                            <span style="color: #4c3d99;">Smart!</span> Adapts to your needs
+                        </div>
+                        
+                        <div style="text-align: center; color: #4c3d99; font-weight: bold; margin-top: 15px;">
+                            ✅ Perfect for: Smart decisions, complex tasks, real intelligence
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visual Comparison -->
+                <div style="background: white; padding: 20px; border-radius: 12px; margin-top: 20px;">
+                    <h4 style="text-align: center; color: #155724; margin-bottom: 20px;">🎯 Quick Visual Comparison</h4>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 20px; align-items: center;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 3em; margin-bottom: 10px;">🔗</div>
+                            <div style="background: #ffc107; color: white; padding: 10px; border-radius: 8px; font-weight: bold;">
+                                LangChain
+                            </div>
+                            <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                                A → B → C<br>
+                                (Always the same path)
+                            </div>
+                        </div>
+                        
+                        <div style="font-size: 2em; color: #28a745;">VS</div>
+                        
+                        <div style="text-align: center;">
+                            <div style="font-size: 3em; margin-bottom: 10px;">📊</div>
+                            <div style="background: #6c5ce7; color: white; padding: 10px; border-radius: 8px; font-weight: bold;">
+                                LangGraph
+                            </div>
+                            <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                                A → ? → B or C<br>
+                                (Chooses best path)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Code Examples with Simple Explanations -->
+            <div style="margin: 30px 0;">
+                <h3 style="text-align: center; color: #2c3e50; margin-bottom: 25px;">👩‍💻 Let's See The Code (Don't Worry, It's Simple!)</h3>
+                
+                <!-- LangChain Code Example -->
+                <div style="margin: 25px 0;">
+                    <h4 style="color: #856404; margin-bottom: 15px;">🔗 LangChain Example - Simple & Direct</h4>
+                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <strong>What this does:</strong> Creates an agent that follows simple steps to help you
+                    </div>
+                    
+                    <div class="code-example">
+                        <div class="code-title">🏠 LangChain Smart Home Agent</div>
+                        <div class="code-content">
+<div class="code-line" data-line="1"><span class="comment"># Step 1: Import the building blocks we need</span></div>
+<div class="code-line" data-line="2"><span class="import">from</span> <span class="string">langchain.agents</span> <span class="import">import</span> <span class="function">create_openai_tools_agent</span>, <span class="function">AgentExecutor</span></div>
+<div class="code-line" data-line="3"><span class="import">from</span> <span class="string">langchain_openai</span> <span class="import">import</span> <span class="function">ChatOpenAI</span></div>
+<div class="code-line" data-line="4"></div>
+<div class="code-line" data-line="5"><span class="comment"># Step 2: Create tools (things our agent can do)</span></div>
+<div class="code-line" data-line="6"><span class="variable">home_tools</span> <span class="operator">=</span> [</div>
+<div class="code-line" data-line="7">    <span class="function">control_lights</span>,      <span class="comment"># Turn lights on/off</span></div>
+<div class="code-line" data-line="8">    <span class="function">set_temperature</span>,    <span class="comment"># Change thermostat</span></div>
+<div class="code-line" data-line="9">    <span class="function">check_weather</span>,      <span class="comment"># Get weather info</span></div>
+<div class="code-line" data-line="10">    <span class="function">play_music</span>         <span class="comment"># Control music</span></div>
+<div class="code-line" data-line="11">]</div>
+<div class="code-line" data-line="12"></div>
+<div class="code-line" data-line="13"><span class="comment"># Step 3: Create the AI brain</span></div>
+<div class="code-line" data-line="14"><span class="variable">ai_brain</span> <span class="operator">=</span> <span class="function">ChatOpenAI</span>(<span class="variable">model</span>=<span class="string">"gpt-4"</span>)</div>
+<div class="code-line" data-line="15"></div>
+<div class="code-line" data-line="16"><span class="comment"># Step 4: Give it instructions</span></div>
+<div class="code-line" data-line="17"><span class="variable">instructions</span> <span class="operator">=</span> <span class="string">"You control a smart home. Be helpful and friendly!"</span></div>
+<div class="code-line" data-line="18"></div>
+<div class="code-line" data-line="19"><span class="comment"># Step 5: Build the agent</span></div>
+<div class="code-line" data-line="20"><span class="variable">agent</span> <span class="operator">=</span> <span class="function">create_openai_tools_agent</span>(<span class="variable">ai_brain</span>, <span class="variable">home_tools</span>, <span class="variable">instructions</span>)</div>
+<div class="code-line" data-line="21"><span class="variable">home_assistant</span> <span class="operator">=</span> <span class="function">AgentExecutor</span>(<span class="variable">agent</span>=<span class="variable">agent</span>, <span class="variable">tools</span>=<span class="variable">home_tools</span>)</div>
+<div class="code-line" data-line="22"></div>
+<div class="code-line" data-line="23"><span class="comment"># Step 6: Use it!</span></div>
+<div class="code-line" data-line="24"><span class="variable">result</span> <span class="operator">=</span> <span class="variable">home_assistant</span>.<span class="function">invoke</span>({<span class="string">"input"</span>: <span class="string">"Make the house cozy for movie night"</span>})</div>
+                        </div>
+                    </div>
+                    
+                    <div style="background: #d4edda; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745; margin-top: 15px;">
+                        <strong>🎯 What happens:</strong> Agent gets your request → Uses tools in order → Dims lights, sets temperature, plays music → Done!
+                    </div>
+                </div>
+
+                <!-- LangGraph Code Example -->
+                <div style="margin: 25px 0;">
+                    <h4 style="color: #4c3d99; margin-bottom: 15px;">📊 LangGraph Example - Smart & Adaptive</h4>
+                    <div style="background: #e8e5ff; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                        <strong>What this does:</strong> Creates an agent that thinks about the situation and makes smart decisions
+                    </div>
+                    
+                    <div class="code-example">
+                        <div class="code-title">🧠 LangGraph Smart Home Agent</div>
+                        <div class="code-content">
+<div class="code-line" data-line="1"><span class="comment"># Step 1: Import the smart building blocks</span></div>
+<div class="code-line" data-line="2"><span class="import">from</span> <span class="string">langgraph.graph</span> <span class="import">import</span> <span class="function">StateGraph</span>, <span class="variable">END</span></div>
+<div class="code-line" data-line="3"><span class="import">from</span> <span class="string">typing</span> <span class="import">import</span> <span class="function">TypedDict</span></div>
+<div class="code-line" data-line="4"></div>
+<div class="code-line" data-line="5"><span class="comment"># Step 2: Define what the agent remembers</span></div>
+<div class="code-line" data-line="6"><span class="keyword">class</span> <span class="function">HomeState</span>(<span class="function">TypedDict</span>):</div>
+<div class="code-line" data-line="7">    <span class="variable">user_request</span>: <span class="keyword">str</span>        <span class="comment"># What user wants</span></div>
+<div class="code-line" data-line="8">    <span class="variable">time_of_day</span>: <span class="keyword">str</span>         <span class="comment"># Morning, evening, etc.</span></div>
+<div class="code-line" data-line="9">    <span class="variable">weather</span>: <span class="keyword">str</span>             <span class="comment"># Hot, cold, etc.</span></div>
+<div class="code-line" data-line="10">    <span class="variable">actions_taken</span>: <span class="function">list</span>       <span class="comment"># What we already did</span></div>
+<div class="code-line" data-line="11"></div>
+<div class="code-line" data-line="12"><span class="comment"># Step 3: Create thinking functions</span></div>
+<div class="code-line" data-line="13"><span class="keyword">def</span> <span class="function">analyze_situation</span>(<span class="variable">state</span>):</div>
+<div class="code-line" data-line="14">    <span class="string">"""Look at the situation and understand what's needed"""</span></div>
+<div class="code-line" data-line="15">    <span class="comment"># Check what time it is, what weather is like, etc.</span></div>
+<div class="code-line" data-line="16">    <span class="keyword">return</span> <span class="variable">state</span></div>
+<div class="code-line" data-line="17"></div>
+<div class="code-line" data-line="18"><span class="keyword">def</span> <span class="function">make_smart_decision</span>(<span class="variable">state</span>):</div>
+<div class="code-line" data-line="19">    <span class="string">"""Decide what to do based on the situation"""</span></div>
+<div class="code-line" data-line="20">    <span class="keyword">if</span> <span class="variable">state</span>[<span class="string">"time_of_day"</span>] == <span class="string">"evening"</span> <span class="keyword">and</span> <span class="variable">state</span>[<span class="string">"weather"</span>] == <span class="string">"cold"</span>:</div>
+<div class="code-line" data-line="21">        <span class="keyword">return</span> <span class="string">"cozy_mode"</span>     <span class="comment"># Warm and dim</span></div>
+<div class="code-line" data-line="22">    <span class="keyword">elif</span> <span class="variable">state</span>[<span class="string">"time_of_day"</span>] == <span class="string">"morning"</span>:</div>
+<div class="code-line" data-line="23">        <span class="keyword">return</span> <span class="string">"energize_mode"</span>  <span class="comment"># Bright and fresh</span></div>
+<div class="code-line" data-line="24">    <span class="keyword">else</span>:</div>
+<div class="code-line" data-line="25">        <span class="keyword">return</span> <span class="string">"comfort_mode"</span>  <span class="comment"># Just comfortable</span></div>
+<div class="code-line" data-line="26"></div>
+<div class="code-line" data-line="27"><span class="comment"># Step 4: Build the smart workflow</span></div>
+<div class="code-line" data-line="28"><span class="variable">workflow</span> <span class="operator">=</span> <span class="function">StateGraph</span>(<span class="variable">HomeState</span>)</div>
+<div class="code-line" data-line="29"></div>
+<div class="code-line" data-line="30"><span class="comment"># Add the thinking steps</span></div>
+<div class="code-line" data-line="31"><span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"analyze"</span>, <span class="variable">analyze_situation</span>)</div>
+<div class="code-line" data-line="32"><span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"decide"</span>, <span class="variable">make_smart_decision</span>)</div>
+<div class="code-line" data-line="33"><span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"cozy_mode"</span>, <span class="variable">make_cozy</span>)</div>
+<div class="code-line" data-line="34"><span class="variable">workflow</span>.<span class="function">add_node</span>(<span class="string">"energize_mode"</span>, <span class="variable">make_energetic</span>)</div>
+<div class="code-line" data-line="35"></div>
+<div class="code-line" data-line="36"><span class="comment"># Step 5: Connect the thinking process</span></div>
+<div class="code-line" data-line="37"><span class="variable">workflow</span>.<span class="function">add_edge</span>(<span class="string">"analyze"</span>, <span class="string">"decide"</span>)  <span class="comment"># Analyze first, then decide</span></div>
+<div class="code-line" data-line="38"><span class="variable">workflow</span>.<span class="function">set_entry_point</span>(<span class="string">"analyze"</span>)     <span class="comment"># Start by analyzing</span></div>
+<div class="code-line" data-line="39"></div>
+<div class="code-line" data-line="40"><span class="comment"># Step 6: Create the smart agent</span></div>
+<div class="code-line" data-line="41"><span class="variable">smart_home_agent</span> <span class="operator">=</span> <span class="variable">workflow</span>.<span class="function">compile</span>()</div>
+                        </div>
+                    </div>
+                    
+                    <div style="background: #cce5ff; padding: 15px; border-radius: 8px; border-left: 4px solid #007bff; margin-top: 15px;">
+                        <strong>🧠 What happens:</strong> Agent analyzes time & weather → Decides best approach → Chooses cozy/energetic/comfort mode → Executes perfect actions for the situation!
+                    </div>
+                </div>
+            </div>
+
+            <!-- Interactive Practice Builder -->
+            <div class="interactive-demo">
+                <h3>🏠 Smart Home Agent Builder</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
+                    <div>
+                        <h4>🛠️ Available Tools:</h4>
+                        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0;">
+                            <button class="nav-btn" onclick="addTool('lights')" style="padding: 8px 12px; font-size: 0.9em;">💡 Lights</button>
+                            <button class="nav-btn" onclick="addTool('thermostat')" style="padding: 8px 12px; font-size: 0.9em;">🌡️ Thermostat</button>
+                            <button class="nav-btn" onclick="addTool('security')" style="padding: 8px 12px; font-size: 0.9em;">🔒 Security</button>
+                            <button class="nav-btn" onclick="addTool('weather')" style="padding: 8px 12px; font-size: 0.9em;">🌤️ Weather</button>
+                            <button class="nav-btn" onclick="addTool('calendar')" style="padding: 8px 12px; font-size: 0.9em;">📅 Calendar</button>
+                            <button class="nav-btn" onclick="addTool('music')" style="padding: 8px 12px; font-size: 0.9em;">🎵 Music</button>
+                        </div>
+                    </div>
+                    <div>
+                        <h4>🧠 Agent Type:</h4>
+                        <div style="margin: 10px 0;">
+                            <label style="margin-right: 20px; display: block; margin-bottom: 10px;">
+                                <input type="radio" name="agentType" value="langchain" checked> 
+                                <span style="background: #ffc107; color: white; padding: 5px 10px; border-radius: 5px; margin-left: 8px;">🔗 LangChain</span>
+                                <small style="display: block; margin-top: 5px; color: #666;">Simple & Direct - Follows steps in order</small>
+                            </label>
+                            <label style="display: block;">
+                                <input type="radio" name="agentType" value="langgraph"> 
+                                <span style="background: #6c5ce7; color: white; padding: 5px 10px; border-radius: 5px; margin-left: 8px;">📊 LangGraph</span>
+                                <small style="display: block; margin-top: 5px; color: #666;">Smart & Adaptive - Makes intelligent decisions</small>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="demo-controls">
+                    <button class="demo-btn" onclick="buildAgent()">🛠️ Build Agent</button>
+                    <button class="demo-btn" onclick="testHomeAgent('morning')">🌅 Test Morning Routine</button>
+                    <button class="demo-btn" onclick="testHomeAgent('evening')">🌙 Test Evening Routine</button>
+                    <button class="demo-btn" onclick="testHomeAgent('away')">🚗 Test Away Mode</button>
+                </div>
+                
+                <div style="margin: 20px 0;">
+                    <h4>🔧 Your Agent Configuration:</h4>
+                    <div id="agentConfig" style="background: #f8f9fa; padding: 15px; border-radius: 8px; font-family: monospace;">
+                        Select tools and build your agent to see the configuration!
+                    </div>
+                </div>
+                
+                <div class="demo-output" id="practiceOutput">Build your agent and test different scenarios!</div>
+            </div>
+
+            <!-- Practice Challenges -->
+            <div class="code-example">
+                <div class="code-title">📋 Practice Challenges (Start Easy!)</div>
+                <div class="code-content">
+<div class="code-line" data-line="1"><span class="comment"># Challenge 1: Baby Steps (15 minutes) 👶</span></div>
+<div class="code-line" data-line="2"><span class="comment"># Create a simple LangChain agent that can:</span></div>
+<div class="code-line" data-line="3"><span class="comment"># - Turn lights on/off</span></div>
+<div class="code-line" data-line="4"><span class="comment"># - Set temperature</span></div>
+<div class="code-line" data-line="5"><span class="comment"># - Check weather</span></div>
+<div class="code-line" data-line="6"><span class="comment"># Goal: Get it working, don't worry about being fancy!</span></div>
+<div class="code-line" data-line="7"></div>
+<div class="code-line" data-line="8"><span class="comment"># Challenge 2: Getting Smarter (30 minutes) 🧠</span></div>
+<div class="code-line" data-line="9"><span class="comment"># Create a LangGraph agent that can:</span></div>
+<div class="code-line" data-line="10"><span class="comment"># - Make decisions based on time of day</span></div>
+<div class="code-line" data-line="11"><span class="comment"># - Adjust settings based on weather</span></div>
+<div class="code-line" data-line="12"><span class="comment"># - Remember what you like</span></div>
+<div class="code-line" data-line="13"><span class="comment"># Goal: Make it think before acting!</span></div>
+<div class="code-line" data-line="14"></div>
+<div class="code-line" data-line="15"><span class="comment"># Challenge 3: Home Genius (45 minutes) 🏡</span></div>
+<div class="code-line" data-line="16"><span class="comment"># Create an agent that coordinates everything:</span></div>
+<div class="code-line" data-line="17"><span class="comment"># - Multiple rooms with different needs</span></div>
+<div class="code-line" data-line="18"><span class="comment"># - Learns from your daily routine</span></div>
+<div class="code-line" data-line="19"><span class="comment"># - Handles complex scenarios like "prepare for guests"</span></div>
+<div class="code-line" data-line="20"><span class="comment"># Goal: Make it truly intelligent and helpful!</span></div>
+<div class="code-line" data-line="21"></div>
+<div class="code-line" data-line="22"><span class="comment"># 💡 Remember: Start simple, then add complexity!</span></div>
+<div class="code-line" data-line="23"><span class="comment"># 🎯 Focus on making it work, not making it perfect!</span></div>
+                </div>
+            </div>
+
+            <div class="tips-box">
+                <div class="tips-title">🎯 Practice Tips (Keep It Simple!)</div>
+                <ul>
+                    <li>🐣 <strong>Start Super Simple:</strong> Get basic functionality working first - even if it's boring!</li>
+                    <li>🧪 <strong>Test Every Small Step:</strong> Don't build everything at once, test each piece individually</li>
+                    <li>💭 <strong>Think Like Your Grandma:</strong> What would be actually useful in a real home?</li>
+                    <li>📊 <strong>LangGraph Only When Needed:</strong> Use it when you need real decision-making, not just for showing off</li>
+                    <li>🔧 <strong>Break Things & Fix Them:</strong> Best way to learn is to mess up and figure out why!</li>
+                    <li>🎉 <strong>Celebrate Small Wins:</strong> Got lights working? That's awesome! Build from there.</li>
+                </ul>
+            </div>
+
+            <div class="concept-card">
+                <div class="concept-title">
+                    🎊 You're Ready to Build the Future!
+                </div>
+                <p>You now understand the difference between simple automation (LangChain) and intelligent agents (LangGraph). Here's what you can do:</p>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <div>
+                        <h4 style="color: #856404;">🔗 With LangChain:</h4>
+                        <ul style="margin-top: 10px;">
+                            <li>✅ Build working agents in minutes</li>
+                            <li>✅ Automate repetitive tasks</li>
+                            <li>✅ Connect to APIs and services</li>
+                            <li>✅ Create reliable, predictable workflows</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 style="color: #4c3d99;">📊 With LangGraph:</h4>
+                        <ul style="margin-top: 10px;">
+                            <li>✅ Create truly intelligent agents</li>
+                            <li>✅ Handle complex decision-making</li>
+                            <li>✅ Build adaptive, learning systems</li>
+                            <li>✅ Solve real-world problems smartly</li>
+                        </ul>
+                    </div>
+                </div>
+                <br>
+                <div style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 12px; margin-top: 20px;">
+                    <h4 style="color: white; margin-bottom: 10px;">🚀 Go Build Something Amazing!</h4>
+                    <p style="margin: 0; opacity: 0.9;">The world needs more intelligent agents. Start with something simple, make it work, then make it smart. You've got this! 💪</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSession = 'intro';
+        let selectedTools = [];
+        let sessionsCompleted = ['intro'];
+        
+        function showEvolutionDemo() {
+            const demo = document.getElementById('evolutionDemo');
+            demo.style.display = demo.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        function runScenarioDemo(scenario) {
+            const output = document.getElementById('scenarioOutput');
+            
+            const scenarios = {
+                travel: {
+                    title: "✈️ Travel Planning Scenario",
+                    task: '"I need to plan a business trip to Tokyo next week"',
+                    traditional: `"I can help you with general travel information. For booking, please visit our travel website or call our support number."`,
+                    smart: `"I can help you plan your Tokyo trip! I found flights from $850, hotels near business districts, and weather forecast shows mild temperatures. However, I can't make actual bookings for you."`,
+                    agent: `"✅ Trip planned and booked!
+
+• Found 3 flight options, selected 2pm departure (fits your calendar)
+• Booked hotel near your meeting location (Shibuya) 
+• Added meetings to your calendar with travel time
+• Ordered travel insurance and JR Pass
+• Set up currency exchange notification
+• Created detailed itinerary with local recommendations
+• Sent confirmation details to your email
+
+🎯 Complete autonomous execution in 2 minutes!"`
+                },
+                
+                meeting: {
+                    title: "📅 Meeting Setup Scenario", 
+                    task: '"Schedule a team meeting to discuss the Q4 budget"',
+                    traditional: `"I can't access your calendar. Please use your calendar app to schedule meetings."`,
+                    smart: `"I'd recommend scheduling a meeting for Q4 budget discussion. Here are some best practices for budget meetings and suggested agenda items..."`,
+                    agent: `"✅ Q4 Budget meeting scheduled!
+
+• Checked everyone's calendar availability
+• Found optimal time: Thursday 2-3pm
+• Booked conference room with projector
+• Sent calendar invites with agenda
+• Prepared budget documents from finance system
+• Set up Teams meeting as backup
+• Reminded participants to review Q3 actuals
+• Created shared folder for supporting docs
+
+🎯 Team ready to have productive budget discussion!"`
+                },
+
+                research: {
+                    title: "🔬 Research Task Scenario",
+                    task: '"Research the latest AI trends and create a summary report"',
+                    traditional: `"I can provide some general information about AI, but I can't browse the internet or create documents for you."`,
+                    smart: `"Based on my training data, here are some AI trends I'm aware of: machine learning, natural language processing, computer vision... (Note: This information may not be current)"`,
+                    agent: `"✅ Research report completed!
+
+• Searched 50+ recent articles and papers
+• Analyzed trends from 10 industry sources
+• Gathered data from 3 expert blogs
+• Cross-referenced with patent filings
+• Created 12-page comprehensive report
+• Generated executive summary
+• Added charts and data visualizations
+• Fact-checked all claims with sources
+• Saved to your Google Drive
+• Scheduled follow-up to track developments
+
+🎯 Actionable insights ready for decision making!"`
+                },
+
+                emergency: {
+                    title: "🚨 Emergency Response Scenario",
+                    task: '"System alert: Database server is down!"',
+                    traditional: `"I'm sorry to hear about the system issue. Please contact your IT support team for technical problems."`,
+                    smart: `"This sounds like a critical system issue. I recommend checking server status, contacting your database administrator, and following your incident response procedures."`,
+                    agent: `"🚨 Emergency response initiated!
+
+• Detected: Database server failure at 14:23
+• Immediately switched to backup server
+• Notified on-call team via Slack and SMS
+• Created incident ticket #INC-2024-0158
+• Started diagnostic log collection
+• Estimated impact: 200 users, $3K/hour revenue
+• Initiated rollback to last stable state
+• Updated status page for customers
+• Escalated to senior engineer (high impact)
+• Recovery completed in 8 minutes
+
+✅ System restored with minimal business impact!"`
+                }
+            };
+            
+            const s = scenarios[scenario];
+            output.innerHTML = `
+<div style="color: #e2e8f0;">
+    <div style="margin-bottom: 25px;">
+        <h4 style="color: #ffffff; margin-bottom: 15px; font-size: 1.3em;">${s.title}</h4>
+        <div style="background: #4a5568; padding: 20px; border-radius: 10px; margin-bottom: 25px; border-left: 5px solid #63b3ed;">
+            <strong style="font-size: 1.1em; color: #ffffff;">User Request:</strong> <span style="color: #e2e8f0;">${s.task}</span>
+        </div>
+    </div>
+
+    <div style="display: grid; gap: 20px;">
+        <div style="background: #742a2a; padding: 20px; border-radius: 12px; border-left: 5px solid #f56565;">
+            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                <span style="font-size: 1.5em; margin-right: 10px;">❌</span>
+                <strong style="color: #fed7d7; font-size: 1.1em;">2020: Traditional Chatbot</strong>
+            </div>
+            <div style="background: #4a5568; padding: 15px; border-radius: 8px; color: #e2e8f0; line-height: 1.5; white-space: pre-line;">${s.traditional}</div>
+        </div>
+        
+        <div style="background: #744210; padding: 20px; border-radius: 12px; border-left: 5px solid #ed8936;">
+            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                <span style="font-size: 1.5em; margin-right: 10px;">⚡</span>
+                <strong style="color: #feebc8; font-size: 1.1em;">2023: Smart Assistant</strong>
+            </div>
+            <div style="background: #4a5568; padding: 15px; border-radius: 8px; color: #e2e8f0; line-height: 1.5; white-space: pre-line;">${s.smart}</div>
+        </div>
+        
+        <div style="background: #276749; padding: 20px; border-radius: 12px; border-left: 5px solid #48bb78;">
+            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                <span style="font-size: 1.5em; margin-right: 10px;">🚀</span>
+                <strong style="color: #c6f6d5; font-size: 1.1em;">2024: AI Agent</strong>
+            </div>
+            <div style="background: #4a5568; padding: 15px; border-radius: 8px; color: #e2e8f0; line-height: 1.5; white-space: pre-line;">${s.agent}</div>
+        </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 25px; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.2);">
+        <div style="font-size: 1.2em; font-weight: bold; margin-bottom: 8px; color: #ffffff;">🎯 The Key Difference</div>
+        <div style="font-size: 1em; opacity: 0.95; color: #ffffff;">Agents don't just respond - they execute complete solutions autonomously!</div>
+    </div>
+</div>`;
+        }
+        
+        function showSession(sessionId) {
+            // Hide all sessions
+            document.querySelectorAll('.session-content').forEach(el => {
+                el.classList.remove('active');
+            });
+            
+            // Remove active class from all nav buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected session
+            document.getElementById(sessionId).classList.add('active');
+            
+            // Activate corresponding nav button
+            event.target.classList.add('active');
+            
+            currentSession = sessionId;
+            
+            // Update progress
+            updateProgress();
+        }
+        
+        function updateProgress() {
+            const sessions = ['intro', 'langchain', 'langgraph', 'building', 'advanced', 'practice'];
+            const currentIndex = sessions.indexOf(currentSession);
+            const progress = ((currentIndex + 1) / sessions.length) * 100;
+            
+            document.getElementById('progressBar').style.width = progress + '%';
+        }
+        
+        function runLangChainDemo(type) {
+            const output = document.getElementById('langchainOutput');
+            
+            const demos = {
+                search: `🔍 LangChain Search Demo:
+
+Step 1: User asks "What's the weather in Tokyo?"
+Step 2: Agent thinks "I need to search for weather information"
+Step 3: Agent calls DuckDuckGoSearchRun tool
+Step 4: Tool returns: "Tokyo weather: Sunny, 25°C"
+Step 5: Agent responds: "The weather in Tokyo is sunny and 25°C"
+
+✅ Simple linear flow - perfect for straightforward tasks!`,
+
+                calculator: `🧮 LangChain Calculator Demo:
+
+Step 1: User asks "What's 15% of 1,250?"
+Step 2: Agent identifies math problem
+Step 3: Agent calls Calculator tool
+Step 4: Tool calculates: 15% × 1,250 = 187.5
+Step 5: Agent responds: "15% of 1,250 is 187.5"
+
+✅ Direct tool usage - no complex decision making needed!`,
+
+                chain: `⛓️ LangChain Chain Demo:
+
+Step 1: User asks "Research AI trends and email summary to john@company.com"
+Step 2: Agent calls SearchTool → finds AI trend data
+Step 3: Agent calls SummaryTool → creates summary from data
+Step 4: Agent calls EmailTool → sends summary to John
+Step 5: Agent responds: "Research completed and summary emailed to John"
+
+✅ Sequential chain - each step feeds into the next!`
+            };
+            
+            output.textContent = demos[type];
+        }
+        
+        function runLangGraphDemo(type) {
+            const output = document.getElementById('langgraphOutput');
+            
+            const demos = {
+                research: `🔬 LangGraph Research Flow:
+
+Step 1: User asks "Is renewable energy becoming more affordable?"
+Step 2: Agent analyzes → "Need multiple sources for accurate answer"
+Step 3: Agent searches → finds 3 sources
+Step 4: Agent evaluates → "Confidence: 60% - need more data"
+Step 5: Agent loops back → searches for financial data
+Step 6: Agent evaluates → "Confidence: 85% - sufficient data"
+Step 7: Agent synthesizes → creates comprehensive answer
+
+✅ Intelligent looping until confident - LangGraph makes decisions!`,
+
+                decision: `🤔 LangGraph Decision Tree:
+
+Input: "I want to cook dinner but I'm tired"
+│
+├─ Analyze mood: "User is tired"
+├─ Check time: "7 PM - dinner time"
+├─ Decision point: "Suggest easy options?"
+│
+├─ Branch A: If user has ingredients → "Quick pasta recipe"
+├─ Branch B: If no ingredients → "Order delivery options"  
+├─ Branch C: If budget tight → "Simple sandwich ideas"
+│
+└─ Result: Personalized recommendation based on context
+
+✅ Complex decision making - considers multiple factors!`,
+
+                loop: `🔄 LangGraph Loop Example:
+
+Task: "Book a restaurant for tonight"
+│
+├─ Try restaurant A → "Fully booked"
+├─ Try restaurant B → "Fully booked"  
+├─ Try restaurant C → "Available at 8 PM"
+├─ Check user preference → "8 PM works"
+├─ Make reservation → "Confirmed"
+│
+Result: "Reservation confirmed at Restaurant C for 8 PM"
+
+✅ Persistent until success - handles failures gracefully!`
+            };
+            
+            output.textContent = demos[type];
+        }
+        
+        function testAgent(type) {
+            const output = document.getElementById('agentOutput');
+            
+            const tests = {
+                weather: `🌤️ Testing Weather Function:
+                
+Input: "What's the weather in New York?"
+
+Agent Process:
+1. 🧠 Analyze: "User wants weather information"
+2. 🔧 Select tool: weather_tool
+3. 📡 Call: weather_tool("New York")
+4. 📊 Result: "Sunny, 72°F"
+5. 💬 Response: "The weather in New York is sunny and 72°F"
+
+✅ Test passed! Weather tool working correctly.`,
+
+                email: `📧 Testing Email Function:
+
+Input: "Send an email to sarah@company.com about the meeting"
+
+Agent Process:
+1. 🧠 Analyze: "User wants to send email"
+2. 🔧 Extract info: to=sarah@company.com, subject=meeting
+3. 📡 Call: email_tool("sarah@company.com", "Meeting", "...")  
+4. 📊 Result: "Email sent successfully"
+5. 💬 Response: "I've sent the email to Sarah about the meeting"
+
+✅ Test passed! Email tool working correctly.`,
+
+                calendar: `📅 Testing Calendar Function:
+
+Input: "What do I have scheduled for tomorrow?"
+
+Agent Process:
+1. 🧠 Analyze: "User wants calendar info"
+2. 🔧 Calculate date: tomorrow = "2024-01-29"
+3. 📡 Call: calendar_tool("2024-01-29")
+4. 📊 Result: "3 meetings scheduled"  
+5. 💬 Response: "You have 3 meetings scheduled for tomorrow"
+
+✅ Test passed! Calendar tool working correctly.`,
+
+                complex: `🧠 Testing Complex Multi-Step Task:
+
+Input: "Check tomorrow's weather and send the forecast to my team"
+
+Agent Process:
+1. 🧠 Analyze: "Need weather data + email functionality"
+2. 🔧 Step 1: weather_tool("current_location") → "Rain, 18°C"
+3. 🔧 Step 2: Format message with weather data
+4. 🔧 Step 3: email_tool("team@company.com", "Weather Update", "...")
+5. 💬 Response: "I've checked tomorrow's weather (rain, 18°C) and sent the forecast to your team"
+
+✅ Test passed! Multi-step coordination working!`
+            };
+            
+            output.textContent = tests[type];
+        }
+        
+        function runAdvancedDemo(type) {
+            const output = document.getElementById('advancedOutput');
+            
+            const demos = {
+                multiagent: `👥 Multi-Agent System Demo:
+
+Task: "Create a market research report on electric vehicles"
+
+🎯 Coordinator: "This needs research, analysis, and writing"
+│
+├─ 🔬 Research Agent: 
+│   ├─ Searches market data
+│   ├─ Finds sales figures  
+│   └─ Gathers competitor info
+│
+├─ 📊 Analysis Agent:
+│   ├─ Processes research data
+│   ├─ Identifies trends
+│   └─ Creates insights
+│
+└─ ✍️ Writing Agent:
+    ├─ Structures the report
+    ├─ Writes clear sections
+    └─ Formats final document
+
+Result: Professional 10-page report with data, analysis, and recommendations
+
+✅ Team collaboration - each agent contributes their expertise!`,
+
+                memory: `💭 Memory Agent Demo:
+
+Conversation 1:
+User: "I prefer morning meetings"
+Agent: "Noted! I'll remember you prefer morning meetings"
+
+Conversation 2 (later):
+User: "Schedule a meeting with the design team"  
+Agent: "I'll schedule it for tomorrow morning at 9 AM, since you prefer morning meetings"
+
+Conversation 3 (next week):
+User: "Set up the quarterly review"
+Agent: "Based on your preference for morning meetings and past scheduling patterns, I suggest 10 AM on Tuesday. Does that work?"
+
+✅ Learning and adapting - agent remembers and applies knowledge!`,
+
+                learning: `🧠 Self-Learning Agent Demo:
+
+Week 1: User asks "Help me plan my day"
+Agent tries: Generic time blocking → User feedback: "Too rigid"
+
+Week 2: Same request
+Agent tries: Flexible scheduling → User feedback: "Better, but still too busy"
+
+Week 3: Same request  
+Agent tries: Balanced schedule with breaks → User feedback: "Perfect!"
+
+Week 4: Same request
+Agent automatically applies learned pattern: Balanced schedule with breaks
+User: "Exactly what I needed!"
+
+✅ Continuous improvement - agent learns what works for each user!`
+            };
+            
+            output.textContent = demos[type];
+        }
+        
+        function addTool(toolName) {
+            if (!selectedTools.includes(toolName)) {
+                selectedTools.push(toolName);
+                updateAgentConfig();
+            }
+        }
+        
+        function updateAgentConfig() {
+            const config = document.getElementById('agentConfig');
+            const agentType = document.querySelector('input[name="agentType"]:checked').value;
+            
+            if (selectedTools.length === 0) {
+                config.textContent = 'Select tools and build your agent to see the configuration!';
+                return;
+            }
+            
+            const toolList = selectedTools.map(tool => `${getToolEmoji(tool)} ${tool}_tool`).join(', ');
+            
+            if (agentType === 'langchain') {
+                config.textContent = `🔗 LangChain Agent Configuration:
+
+tools = [${toolList}]
+agent = create_openai_tools_agent(llm, tools, prompt)
+executor = AgentExecutor(agent=agent, tools=tools)
+
+# Simple linear execution - perfect for straightforward home control!`;
+            } else {
+                config.textContent = `📊 LangGraph Agent Configuration:
+
+class SmartHomeState(TypedDict):
+    user_input: str
+    home_status: dict
+    actions_taken: list
+
+workflow = StateGraph(SmartHomeState)
+workflow.add_node("analyze", analyze_request)
+workflow.add_node("decide", make_smart_decisions)
+${selectedTools.map(tool => `workflow.add_node("${tool}", handle_${tool})`).join('\n')}
+
+# Intelligent decision making - adapts to context and learns!`;
+            }
+        }
+        
+        function getToolEmoji(tool) {
+            const emojis = {
+                lights: '💡',
+                thermostat: '🌡️', 
+                security: '🔒',
+                weather: '🌤️',
+                calendar: '📅',
+                music: '🎵'
+            };
+            return emojis[tool] || '🔧';
+        }
+        
+        function buildAgent() {
+            if (selectedTools.length === 0) {
+                alert('Please select at least one tool first!');
+                return;
+            }
+            
+            const output = document.getElementById('practiceOutput');
+            const agentType = document.querySelector('input[name="agentType"]:checked').value;
+            
+            output.textContent = `🛠️ Building Your Smart Home Agent...
+
+Selected Tools: ${selectedTools.map(tool => getToolEmoji(tool) + ' ' + tool).join(', ')}
+Agent Type: ${agentType === 'langchain' ? '🔗 LangChain (Simple)' : '📊 LangGraph (Smart)'}
+
+✅ Agent built successfully!
+
+Your agent can now:
+${selectedTools.map(tool => `• Control ${tool} (${getToolEmoji(tool)})`).join('\n')}
+${agentType === 'langgraph' ? '\n• Make intelligent decisions based on context\n• Learn from your preferences\n• Handle complex scenarios' : '\n• Execute commands directly\n• Handle basic automation'}
+
+Ready to test! Try the scenario buttons below.`;
+        }
+        
+        function testHomeAgent(scenario) {
+            if (selectedTools.length === 0) {
+                alert('Please build your agent first!');
+                return;
+            }
+            
+            const output = document.getElementById('practiceOutput');
+            const agentType = document.querySelector('input[name="agentType"]:checked').value;
+            
+            const scenarios = {
+                morning: {
+                    input: "Good morning! Set up the house for the day",
+                    langchain: `🌅 Morning Routine (LangChain):
+
+User: "Good morning! Set up the house for the day"
+
+Agent executes in sequence:
+${selectedTools.includes('lights') ? '1. 💡 Turn on lights to 80% brightness' : ''}
+${selectedTools.includes('thermostat') ? '2. 🌡️ Set temperature to 72°F' : ''}
+${selectedTools.includes('music') ? '3. 🎵 Play morning playlist' : ''}
+${selectedTools.includes('weather') ? '4. 🌤️ Check weather: "Sunny, 75°F"' : ''}
+${selectedTools.includes('calendar') ? '5. 📅 Check calendar: "Meeting at 10 AM"' : ''}
+
+Response: "Good morning! I've set up the house for your day."`,
+                    
+                    langgraph: `🌅 Morning Routine (LangGraph):
+
+User: "Good morning! Set up the house for the day"
+
+Agent intelligent process:
+1. 🧠 Analyze: "Morning routine needed"
+2. 🌤️ Check weather: "Sunny, 75°F - nice day!"
+3. 📅 Check calendar: "Meeting at 10 AM"
+4. 🤔 Decision: "User has meeting, needs energizing setup"
+
+Smart actions:
+${selectedTools.includes('lights') ? '• 💡 Lights: Bright (90%) - energizing for meeting' : ''}  
+${selectedTools.includes('thermostat') ? '• 🌡️ Temperature: Cool (70°F) - comfortable for video call' : ''}
+${selectedTools.includes('music') ? '• 🎵 Music: Upbeat morning playlist' : ''}
+
+Response: "Good morning! I've optimized your home for a productive day with your 10 AM meeting."`
+                },
+                
+                evening: {
+                    input: "It's evening, help me wind down",
+                    langchain: `🌙 Evening Routine (LangChain):
+
+User: "It's evening, help me wind down"
+
+Agent executes in sequence:
+${selectedTools.includes('lights') ? '1. 💡 Dim lights to 30%' : ''}
+${selectedTools.includes('thermostat') ? '2. 🌡️ Lower temperature to 68°F' : ''}
+${selectedTools.includes('music') ? '3. 🎵 Play relaxing music' : ''}
+${selectedTools.includes('security') ? '4. 🔒 Activate night security mode' : ''}
+
+Response: "Evening setup complete. Time to relax!"`,
+                    
+                    langgraph: `🌙 Evening Routine (LangGraph):
+
+User: "It's evening, help me wind down"  
+
+Agent intelligent process:
+1. 🧠 Analyze: "User wants to relax and prepare for sleep"
+2. 📅 Check tomorrow's calendar: "Early meeting at 8 AM"
+3. 🤔 Decision: "Need good sleep for early meeting"
+
+Smart actions:
+${selectedTools.includes('lights') ? '• 💡 Lights: Gradual dimming over 30 minutes' : ''}
+${selectedTools.includes('thermostat') ? '• 🌡️ Temperature: Sleep-optimal 66°F' : ''}  
+${selectedTools.includes('music') ? '• 🎵 Music: Sleep-inducing sounds' : ''}
+${selectedTools.includes('security') ? '• 🔒 Security: Full night mode activated' : ''}
+
+Response: "I've set up a relaxing environment and optimized for your early meeting tomorrow."`
+                },
+                
+                away: {
+                    input: "I'm leaving for vacation, set away mode",
+                    langchain: `🚗 Away Mode (LangChain):
+
+User: "I'm leaving for vacation, set away mode"
+
+Agent executes in sequence:
+${selectedTools.includes('lights') ? '1. 💡 Turn off all lights' : ''}
+${selectedTools.includes('thermostat') ? '2. 🌡️ Set to energy-save mode (60°F)' : ''}
+${selectedTools.includes('security') ? '3. 🔒 Activate full security system' : ''}
+${selectedTools.includes('music') ? '4. 🎵 Turn off all audio systems' : ''}
+
+Response: "Away mode activated. Have a great vacation!"`,
+                    
+                    langgraph: `🚗 Away Mode (LangGraph):
+
+User: "I'm leaving for vacation, set away mode"
+
+Agent intelligent process:
+1. 🧠 Analyze: "Extended absence - need comprehensive away mode"
+2. 📅 Check calendar: "Away for 7 days"
+3. 🌤️ Check weather forecast: "Rain expected midweek"
+4. 🤔 Decision: "Need security + energy savings + maintenance prep"
+
+Smart actions:
+${selectedTools.includes('lights') ? '• 💡 Lights: Random pattern to simulate occupancy' : ''}
+${selectedTools.includes('thermostat') ? '• 🌡️ Temperature: Gradual reduction to 55°F over 2 hours' : ''}
+${selectedTools.includes('security') ? '• 🔒 Security: Maximum protection + neighbor notifications' : ''}
+${selectedTools.includes('weather') ? '• 🌤️ Weather monitoring: Alert if extreme conditions' : ''}
+
+Response: "Smart away mode activated for 7 days. Security maximized, energy optimized, weather monitoring enabled."`
+                }
+            };
+            
+            const scenarioData = scenarios[scenario];
+            const response = agentType === 'langchain' ? scenarioData.langchain : scenarioData.langgraph;
+            
+            output.textContent = response;
+        }
+        
+        // Initialize progress on page load
+        updateProgress();
+    </script>
+</body>
+</html>
