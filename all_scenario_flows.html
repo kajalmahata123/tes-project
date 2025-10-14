@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cross-Network Transaction Flow Diagrams</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #1a1f71;
+            margin-bottom: 30px;
+            font-size: 32px;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #e0e0e0;
+            flex-wrap: wrap;
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            background: #f5f5f5;
+            border: none;
+            border-radius: 10px 10px 0 0;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            color: #666;
+        }
+        
+        .tab:hover {
+            background: #e0e0e0;
+        }
+        
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .scenario-container {
+            display: none;
+        }
+        
+        .scenario-container.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .scenario-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        
+        .scenario-header h2 {
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        
+        .scenario-header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        /* Flow Diagram Styles */
+        .flow-diagram {
+            position: relative;
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 40px;
+            min-height: 500px;
+            margin-bottom: 30px;
+        }
+        
+        .flow-step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 40px;
+            position: relative;
+        }
+        
+        .step-number {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .step-content {
+            flex: 1;
+            margin-left: 20px;
+        }
+        
+        .node {
+            display: inline-block;
+            padding: 15px 25px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+            margin: 5px;
+        }
+        
+        .node-customer {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 2px solid #1976d2;
+        }
+        
+        .node-atm {
+            background: #fff3e0;
+            color: #f57c00;
+            border: 2px solid #f57c00;
+        }
+        
+        .node-network {
+            background: #f3e5f5;
+            color: #7b1fa2;
+            border: 2px solid #7b1fa2;
+        }
+        
+        .node-visadps {
+            background: #1a1f71;
+            color: white;
+            border: 2px solid #0052cc;
+        }
+        
+        .node-gateway {
+            background: #e8f5e9;
+            color: #388e3c;
+            border: 2px solid #388e3c;
+        }
+        
+        .node-issuer {
+            background: #fce4ec;
+            color: #c2185b;
+            border: 2px solid #c2185b;
+        }
+        
+        .arrow {
+            display: inline-block;
+            margin: 0 10px;
+            font-size: 24px;
+            color: #666;
+            animation: slideRight 1.5s infinite;
+        }
+        
+        @keyframes slideRight {
+            0%, 100% { transform: translateX(0); opacity: 0.5; }
+            50% { transform: translateX(10px); opacity: 1; }
+        }
+        
+        .message-box {
+            background: white;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+            font-size: 13px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .message-box strong {
+            color: #1a1f71;
+        }
+        
+        .timing {
+            background: #fff9c4;
+            padding: 8px 12px;
+            border-radius: 5px;
+            display: inline-block;
+            margin-top: 10px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #f57f17;
+        }
+        
+        .fee-box {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .fee-box h3 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        
+        .fee-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 13px;
+        }
+        
+        .fee-total {
+            border-top: 2px solid #4caf50;
+            margin-top: 10px;
+            padding-top: 10px;
+            font-weight: bold;
+            color: #1b5e20;
+        }
+        
+        .info-callout {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        
+        .info-callout h4 {
+            color: #1565c0;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .info-callout ul {
+            margin-left: 20px;
+            font-size: 13px;
+            color: #333;
+        }
+        
+        .info-callout li {
+            margin-bottom: 5px;
+        }
+        
+        /* Comparison Table */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .comparison-table th {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-size: 14px;
+        }
+        
+        .comparison-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 13px;
+        }
+        
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .comparison-table tr:hover {
+            background: #f5f5f5;
+        }
+        
+        .highlight {
+            background: #fff9c4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Cross-Network Transaction Flow Diagrams</h1>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="showScenario(1)">Scenario 1: Foreign Card at Visa ATM</button>
+            <button class="tab" onclick="showScenario(2)">Scenario 2: Visa Card at Foreign ATM</button>
+            <button class="tab" onclick="showScenario(3)">Scenario 3: Same Network</button>
+            <button class="tab" onclick="showScenario(4)">Scenario 4: Dual Network Card</button>
+        </div>
+        
+        <!-- Scenario 1 -->
+        <div id="scenario1" class="scenario-container active">
+            <div class="scenario-header">
+                <h2>Scenario 1: STAR/PULSE/NYCE/Accel/Shazam Card at Visa DPS ATM</h2>
+                <p>Example: Chase STAR card used at Bank of America ATM (Visa DPS Network)</p>
+            </div>
+            
+            <div class="flow-diagram">
+                <div class="flow-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-customer">Customer</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-atm">Bank of America ATM<br>(Visa DPS Network)</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Action:</strong> Customer inserts Chase STAR card (BIN: 600000)<br>
+                            <strong>ATM Process:</strong> Reads card, prompts for PIN, builds ISO 8583 message
+                        </div>
+                        <span class="timing">⏱ Time: ~2.5 seconds (customer interaction)</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-atm">ATM</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-visadps">Visa DPS Network</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Message:</strong> Authorization Request (MTI: 0100)<br>
+                            <strong>Key Fields:</strong> Field_2: 600000****1234, Field_4: $100.00, Field_52: Encrypted PIN<br>
+                            <strong>Connection:</strong> TCP/IP to dps.visa.com:5000
+                        </div>
+                        <span class="timing">⏱ Network Transit: ~100ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-visadps">Visa DPS</span>
+                            <span style="margin: 0 10px; font-size: 20px;">🔍</span>
+                            <span style="font-size: 14px; color: #666;">BIN Routing Lookup</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Process:</strong> BIN 600000 lookup in routing table<br>
+                            <strong>Result:</strong> STAR Network (Fiserv)<br>
+                            <strong>Decision:</strong> Route to STAR Gateway<br>
+                            <strong>Added Fields:</strong> Field_28 (fee), Field_90 (original data), Field_100 (network ID)
+                        </div>
+                        <span class="timing">⏱ Processing: ~100ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-visadps">Visa DPS</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-gateway">STAR Gateway</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Translation:</strong> Visa ISO 8583 → STAR format<br>
+                            <strong>Modified Fields:</strong> Field_32: VISADPS→STARNET, Added Field_62, Field_63<br>
+                            <strong>Connection:</strong> Dedicated inter-network line
+                        </div>
+                        <span class="timing">⏱ Translation + Transit: ~150ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-gateway">STAR Gateway</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-network">STAR Network</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-issuer">Chase Bank (Issuer)</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Routing:</strong> STAR identifies Chase as issuer<br>
+                            <strong>PIN Security:</strong> Re-encrypted with STAR HSM keys<br>
+                            <strong>Authorization:</strong> Chase checks balance, fraud rules, limits
+                        </div>
+                        <span class="timing">⏱ STAR Network + Authorization: ~300ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-issuer">Chase Bank</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-network">STAR Network</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-gateway">STAR Gateway</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Response:</strong> Authorization Response (MTI: 0110)<br>
+                            <strong>Field_39:</strong> 00 (Approved)<br>
+                            <strong>Field_38:</strong> AUTH01 (Authorization code)<br>
+                            <strong>Field_54:</strong> Available balance (optional)
+                        </div>
+                        <span class="timing">⏱ Response Transit: ~200ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">7</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-gateway">STAR Gateway</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-visadps">Visa DPS</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-atm">ATM</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Process:</strong> Response translated back to Visa format<br>
+                            <strong>Logging:</strong> Transaction logged for settlement<br>
+                            <strong>ATM Action:</strong> Dispenses $100 cash, prints receipt
+                        </div>
+                        <span class="timing">⏱ Translation + Dispensing: ~300ms + 2.5s</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="fee-box">
+                <h3>💰 Fee Breakdown</h3>
+                <div class="fee-item">
+                    <span>Transaction Amount:</span>
+                    <span>$100.00</span>
+                </div>
+                <div class="fee-item">
+                    <span>ATM Owner Surcharge (Bank of America):</span>
+                    <span>$3.00</span>
+                </div>
+                <div class="fee-item">
+                    <span>Visa DPS Interchange Fee:</span>
+                    <span>$0.50</span>
+                </div>
+                <div class="fee-item">
+                    <span>STAR Network Fee:</span>
+                    <span>$0.35</span>
+                </div>
+                <div class="fee-item">
+                    <span>Chase Foreign ATM Fee:</span>
+                    <span>$2.00</span>
+                </div>
+                <div class="fee-item fee-total">
+                    <span>Total Debited from Account:</span>
+                    <span>$105.85</span>
+                </div>
+            </div>
+            
+            <div class="info-callout">
+                <h4>📊 Total Transaction Time: ~6.75 seconds</h4>
+                <ul>
+                    <li>Customer interaction (card insert to PIN entry): ~2.5s</li>
+                    <li>Authorization processing (7 network hops): ~1.25s</li>
+                    <li>Cash dispensing: ~2.5s</li>
+                    <li>Receipt printing: ~0.5s</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Scenario 2 -->
+        <div id="scenario2" class="scenario-container">
+            <div class="scenario-header">
+                <h2>Scenario 2: Visa Card at STAR/PULSE/NYCE Network ATM (Most Common)</h2>
+                <p>Example: Capital One Visa card used at 7-Eleven ATM (STAR Network)</p>
+            </div>
+            
+            <div class="flow-diagram">
+                <div class="flow-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-customer">Customer</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-atm">7-Eleven ATM<br>(STAR Network)</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Action:</strong> Customer inserts Capital One Visa card (BIN: 4532)<br>
+                            <strong>ATM Process:</strong> Reads card, identifies BIN 4532 = Visa (not STAR)<br>
+                            <strong>Decision:</strong> Must route to Visa network
+                        </div>
+                        <span class="timing">⏱ Time: ~2.5 seconds (customer interaction)</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-atm">ATM</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-network">STAR Network Switch</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Message:</strong> Authorization Request (MTI: 0100)<br>
+                            <strong>Key Fields:</strong> Field_2: 4532****9012, Field_4: $40.00<br>
+                            <strong>Field_32:</strong> STAR acquirer code (000007)
+                        </div>
+                        <span class="timing">⏱ Network Transit: ~100ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-network">STAR Network</span>
+                            <span style="margin: 0 10px; font-size: 20px;">🔍</span>
+                            <span style="font-size: 14px; color: #666;">BIN Recognition</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Process:</strong> BIN 4532 lookup → Visa card detected<br>
+                            <strong>Decision:</strong> Route to Visa via inter-network gateway<br>
+                            <strong>Modified Fields:</strong> Field_32: STAR→STARNET, Field_100: STAR (originating network)
+                        </div>
+                        <span class="timing">⏱ Processing: ~100ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-network">STAR Network</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-gateway">Inter-Network Gateway</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-visadps">Visa DPS</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Translation:</strong> STAR format → Visa ISO 8583<br>
+                            <strong>Added Fields:</strong> Field_28 (network fee), Field_90 (original STAR data)<br>
+                            <strong>PIN Handling:</strong> Re-encrypted using Visa HSM keys
+                        </div>
+                        <span class="timing">⏱ Gateway + Transit: ~200ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-visadps">Visa DPS</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-issuer">Capital One (Issuer)</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Routing:</strong> Visa DPS identifies Capital One as issuer from BIN<br>
+                            <strong>Field_60:</strong> FOREIGN_ATM_STAR (flags non-Visa ATM)<br>
+                            <strong>Authorization:</strong> Capital One processes and approves
+                        </div>
+                        <span class="timing">⏱ Visa Routing + Auth: ~300ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-issuer">Capital One</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-visadps">Visa DPS</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-gateway">Gateway</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Response:</strong> Approval (Field_39: 00)<br>
+                            <strong>Process:</strong> Visa DPS logs for settlement with STAR<br>
+                            <strong>Translation:</strong> Visa format → STAR format
+                        </div>
+                        <span class="timing">⏱ Response + Translation: ~200ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">7</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-gateway">Gateway</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-network">STAR Network</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-atm">ATM</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Process:</strong> Response forwarded through STAR to 7-Eleven ATM<br>
+                            <strong>ATM Action:</strong> Dispenses $40 cash, prints receipt with foreign ATM notice
+                        </div>
+                        <span class="timing">⏱ Response + Dispensing: ~200ms + 2.5s</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="fee-box">
+                <h3>💰 Fee Breakdown</h3>
+                <div class="fee-item">
+                    <span>Transaction Amount:</span>
+                    <span>$40.00</span>
+                </div>
+                <div class="fee-item">
+                    <span>7-Eleven ATM Surcharge:</span>
+                    <span>$2.95</span>
+                </div>
+                <div class="fee-item">
+                    <span>STAR Network Fee:</span>
+                    <span>$0.35</span>
+                </div>
+                <div class="fee-item">
+                    <span>Visa DPS Network Fee:</span>
+                    <span>$0.40</span>
+                </div>
+                <div class="fee-item">
+                    <span>Capital One Foreign ATM Fee:</span>
+                    <span>$2.00</span>
+                </div>
+                <div class="fee-item fee-total">
+                    <span>Total Debited from Account:</span>
+                    <span>$45.70</span>
+                </div>
+            </div>
+            
+            <div class="info-callout">
+                <h4>⭐ Why This is Most Common:</h4>
+                <ul>
+                    <li>Visa/Mastercard have ~70% market share of US debit cards</li>
+                    <li>Most ATMs are connected to regional networks (STAR, PULSE, NYCE)</li>
+                    <li>Bank-owned ATMs often use Visa DPS, but many convenience store/retail ATMs use regional networks</li>
+                    <li>This creates frequent cross-network scenarios</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Scenario 3 -->
+        <div id="scenario3" class="scenario-container">
+            <div class="scenario-header">
+                <h2>Scenario 3: Visa Card at Visa DPS ATM (Same Network - Fastest)</h2>
+                <p>Example: Bank of America Visa card used at Bank of America ATM</p>
+            </div>
+            
+            <div class="flow-diagram">
+                <div class="flow-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-customer">Customer</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-atm">Bank of America ATM<br>(Visa DPS Network)</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Action:</strong> Customer inserts BofA Visa card (BIN: 4147)<br>
+                            <strong>ATM Process:</strong> Recognizes own bank card + Visa network<br>
+                            <strong>Benefit:</strong> Fastest routing, no cross-network fees
+                        </div>
+                        <span class="timing">⏱ Time: ~2.5 seconds (customer interaction)</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-atm">ATM</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-visadps">Visa DPS Network</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Message:</strong> Authorization Request (MTI: 0100)<br>
+                            <strong>Key Fields:</strong> Field_2: 4147****0123, Field_4: $150.00<br>
+                            <strong>Routing:</strong> Direct connection, no intermediary networks
+                        </div>
+                        <span class="timing">⏱ Network Transit: ~100ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-visadps">Visa DPS</span>
+                            <span style="margin: 0 10px; font-size: 20px;">🔍</span>
+                            <span style="font-size: 14px; color: #666;">BIN Routing Lookup</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Process:</strong> BIN 4147 lookup → Bank of America Visa<br>
+                            <strong>Result:</strong> Same network! No translation needed<br>
+                            <strong>Decision:</strong> Route directly to BofA authorization system<br>
+                            <strong>Optimization:</strong> Minimal processing, no network fees
+                        </div>
+                        <span class="timing">⏱ Processing: ~50ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">4</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-visadps">Visa DPS</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-issuer">Bank of America (Issuer)</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Direct Route:</strong> Visa DPS to BofA authorization system<br>
+                            <strong>Authorization:</strong> Balance check, fraud check, limits check<br>
+                            <strong>Speed:</strong> Fastest path - only 3 hops total (ATM → Visa DPS → Issuer)
+                        </div>
+                        <span class="timing">⏱ Authorization: ~150ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-issuer">Bank of America</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-visadps">Visa DPS</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-atm">ATM</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Response:</strong> Approval (Field_39: 00)<br>
+                            <strong>Fast Path:</strong> Direct response back through Visa DPS<br>
+                            <strong>ATM Action:</strong> Dispenses $150 cash immediately
+                        </div>
+                        <span class="timing">⏱ Response + Dispensing: ~150ms + 2.5s</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="fee-box">
+                <h3>💰 Fee Breakdown (Minimal Fees!)</h3>
+                <div class="fee-item">
+                    <span>Transaction Amount:</span>
+                    <span>$150.00</span>
+                </div>
+                <div class="fee-item">
+                    <span>ATM Owner Surcharge:</span>
+                    <span class="highlight">$0.00 (Own bank ATM)</span>
+                </div>
+                <div class="fee-item">
+                    <span>Network Processing Fee:</span>
+                    <span>$0.15 (internal)</span>
+                </div>
+                <div class="fee-item">
+                    <span>Foreign ATM Fee:</span>
+                    <span class="highlight">$0.00 (Own bank)</span>
+                </div>
+                <div class="fee-item fee-total">
+                    <span>Total Debited from Account:</span>
+                    <span class="highlight">$150.15</span>
+                </div>
+            </div>
+            
+            <div class="info-callout">
+                <h4>✅ Advantages of Same-Network Transactions:</h4>
+                <ul>
+                    <li><strong>Speed:</strong> ~600ms authorization vs ~1,300ms cross-network (50% faster)</li>
+                    <li><strong>Lower Fees:</strong> No ATM surcharge, no cross-network fees, no foreign ATM fees</li>
+                    <li><strong>Reliability:</strong> Fewer points of failure, simpler routing</li>
+                    <li><strong>Better Experience:</strong> May show account details, allow multiple transactions</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Scenario 4 -->
+        <div id="scenario4" class="scenario-container">
+            <div class="scenario-header">
+                <h2>Scenario 4: Dual Network Card - Least Cost Routing (LCR)</h2>
+                <p>Example: PNC debit card (supports both Visa + STAR) at PNC ATM</p>
+            </div>
+            
+            <div class="flow-diagram">
+                <div class="flow-step">
+                    <div class="step-number">1</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-customer">Customer</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-atm">PNC Bank ATM<br>(Visa DPS Network)</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Action:</strong> Customer inserts PNC dual-network card<br>
+                            <strong>Card Chip Contains:</strong><br>
+                            • Application 1: Visa Debit (AID: A0000000031010)<br>
+                            • Application 2: STAR (AID: A0000000042010)
+                        </div>
+                        <span class="timing">⏱ Time: ~2.5 seconds</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">2</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-atm">ATM Chip Reader</span>
+                            <span style="margin: 0 10px; font-size: 20px;">📱</span>
+                            <span style="font-size: 14px; color: #666;">Reads Multiple Applications</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>EMV Chip Data:</strong><br>
+                            • AID 1: Visa Debit - Priority 1, Cost: $0.50<br>
+                            • AID 2: STAR - Priority 2, Cost: $0.25<br>
+                            <strong>ATM Decision Logic:</strong> Least Cost Routing enabled
+                        </div>
+                        <span class="timing">⏱ Chip Read: ~200ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">3</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-atm">ATM Controller</span>
+                            <span style="margin: 0 10px; font-size: 20px;">⚖️</span>
+                            <span style="font-size: 14px; color: #666;">Network Selection</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Cost Comparison:</strong><br>
+                            • Route via Visa DPS: $0.50 network fee<br>
+                            • Route via STAR: $0.25 network fee<br>
+                            <strong>Decision:</strong> <span class="highlight">Select STAR (saves $0.25)</span><br>
+                            <strong>Regulatory Compliance:</strong> Durbin Amendment allows LCR
+                        </div>
+                        <span class="timing">⏱ Decision: ~50ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">4A</div>
+                    <div class="step-content">
+                        <div style="background: #fff9c4; padding: 15px; border-radius: 10px; border: 2px dashed #f57f17;">
+                            <strong>🔀 Path A: If Visa Selected (Higher Cost)</strong>
+                            <div style="margin-top: 10px;">
+                                <span class="node node-atm">ATM</span>
+                                <span class="arrow">→</span>
+                                <span class="node node-visadps">Visa DPS</span>
+                                <span class="arrow">→</span>
+                                <span class="node node-issuer">PNC Bank</span>
+                            </div>
+                            <div style="margin-top: 10px; font-size: 13px;">
+                                • Direct Visa routing<br>
+                                • Network fee: $0.50<br>
+                                • Time: ~600ms
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">4B</div>
+                    <div class="step-content">
+                        <div style="background: #e8f5e9; padding: 15px; border-radius: 10px; border: 2px solid #4caf50;">
+                            <strong>✅ Path B: STAR Selected (Lower Cost - CHOSEN)</strong>
+                            <div style="margin-top: 10px;">
+                                <span class="node node-atm">ATM</span>
+                                <span class="arrow">→</span>
+                                <span class="node node-network">STAR Network</span>
+                                <span class="arrow">→</span>
+                                <span class="node node-issuer">PNC Bank</span>
+                            </div>
+                            <div style="margin-top: 10px; font-size: 13px;">
+                                • STAR network routing<br>
+                                • Network fee: $0.25<br>
+                                • Time: ~500ms<br>
+                                • <strong>Savings: $0.25 per transaction</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">5</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-atm">ATM</span>
+                            <span style="font-size: 14px; color: #666;">builds message with STAR AID</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Message:</strong> Authorization Request (MTI: 0100)<br>
+                            <strong>Field_55:</strong> EMV data with selected STAR AID (A0000000042010)<br>
+                            <strong>Field_61:</strong> SELECTED_AID indicator<br>
+                            <strong>Routing:</strong> Transaction proceeds on STAR network
+                        </div>
+                        <span class="timing">⏱ Message Build: ~100ms</span>
+                    </div>
+                </div>
+                
+                <div class="flow-step">
+                    <div class="step-number">6</div>
+                    <div class="step-content">
+                        <div>
+                            <span class="node node-network">STAR Network</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-issuer">PNC Bank</span>
+                            <span class="arrow">→</span>
+                            <span class="node node-atm">Response & Cash</span>
+                        </div>
+                        <div class="message-box">
+                            <strong>Authorization:</strong> PNC approves on STAR network<br>
+                            <strong>Response:</strong> Approval code returned<br>
+                            <strong>Benefit:</strong> Lower fees benefit both ATM owner and potentially customer
+                        </div>
+                        <span class="timing">⏱ Auth + Dispensing: ~400ms + 2.5s</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="fee-box">
+                <h3>💰 Fee Comparison: Visa vs STAR Routing</h3>
+                <table style="width: 100%; margin-top: 10px;">
+                    <tr>
+                        <td style="font-weight: bold; padding: 5px;">Fee Type</td>
+                        <td style="font-weight: bold; padding: 5px;">Via Visa</td>
+                        <td style="font-weight: bold; padding: 5px; background: #e8f5e9;">Via STAR ✓</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px;">Transaction Amount</td>
+                        <td style="padding: 5px;">$150.00</td>
+                        <td style="padding: 5px;">$150.00</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px;">ATM Fee</td>
+                        <td style="padding: 5px;">$3.00</td>
+                        <td style="padding: 5px;">$3.00</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px;">Network Fee (to ATM owner)</td>
+                        <td style="padding: 5px;">$0.50</td>
+                        <td style="padding: 5px; background: #e8f5e9;"><strong>$0.25</strong></td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px;">Bank Fee</td>
+                        <td style="padding: 5px;">$2.00</td>
+                        <td style="padding: 5px;">$2.00</td>
+                    </tr>
+                    <tr style="font-weight: bold;">
+                        <td style="padding: 5px; border-top: 2px solid #333;">Customer Pays</td>
+                        <td style="padding: 5px; border-top: 2px solid #333;">$155.50</td>
+                        <td style="padding: 5px; border-top: 2px solid #333; background: #e8f5e9;">$155.25</td>
+                    </tr>
+                    <tr style="font-weight: bold; color: #2e7d32;">
+                        <td style="padding: 5px;">ATM Owner Saves</td>
+                        <td style="padding: 5px;">-</td>
+                        <td style="padding: 5px; background: #e8f5e9;">$0.25</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <div class="info-callout">
+                <h4>📜 Regulatory Context: Durbin Amendment</h4>
+                <ul>
+                    <li><strong>Requirement:</strong> Banks with >$10B assets must enable at least 2 unaffiliated networks on debit cards</li>
+                    <li><strong>Purpose:</strong> Increase competition, reduce merchant costs</li>
+                    <li><strong>Impact:</strong> ATM/Merchant can choose least expensive routing option</li>
+                    <li><strong>Cardholder:</strong> May not see option but benefits from potential fee reductions</li>
+                </ul>
+            </div>
+            
+            <div class="info-callout" style="background: #fce4ec; border-left-color: #c2185b;">
+                <h4>⚠️ Customer Choice Scenario</h4>
+                <ul>
+                    <li>Some ATMs display: "Select Network: 1) Visa  2) STAR"</li>
+                    <li>Customer chooses based on their preference (bank fees may vary by network)</li>
+                    <li>More transparent but less common than automatic LCR</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Comparison Table -->
+        <div style="margin-top: 40px;">
+            <h2 style="text-align: center; margin-bottom: 20px; color: #1a1f71;">Scenario Comparison</h2>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Aspect</th>
+                        <th>Scenario 1<br>Foreign Card → Visa ATM</th>
+                        <th>Scenario 2<br>Visa Card → Foreign ATM</th>
+                        <th>Scenario 3<br>Same Network</th>
+                        <th>Scenario 4<br>Dual Network (LCR)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Network Hops</strong></td>
+                        <td>5 hops</td>
+                        <td>5 hops</td>
+                        <td class="highlight">3 hops</td>
+                        <td>3-4 hops</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Authorization Time</strong></td>
+                        <td>~1.25 seconds</td>
+                        <td>~1.30 seconds</td>
+                        <td class="highlight">~600ms</td>
+                        <td>~500-800ms</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Total Transaction Time</strong></td>
+                        <td>~6.75 seconds</td>
+                        <td>~7.00 seconds</td>
+                        <td class="highlight">~6.00 seconds</td>
+                        <td>~6.20 seconds</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Message Translation</strong></td>
+                        <td>Yes (Visa ↔ STAR)</td>
+                        <td>Yes (STAR ↔ Visa)</td>
+                        <td class="highlight">No</td>
+                        <td>Depends on selection</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PIN Re-encryption</strong></td>
+                        <td>Yes (2 HSMs)</td>
+                        <td>Yes (2 HSMs)</td>
+                        <td class="highlight">No (1 HSM)</td>
+                        <td>Depends on selection</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Typical Fees</strong></td>
+                        <td>$5.85 - $6.50</td>
+                        <td>$5.70 - $6.40</td>
+                        <td class="highlight">$0.15 - $0.50</td>
+                        <td>$5.25 - $5.50</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Frequency</strong></td>
+                        <td>Less Common (20%)</td>
+                        <td class="highlight">Most Common (50%)</td>
+                        <td>Common (25%)</td>
+                        <td>Growing (5%)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Complexity</strong></td>
+                        <td>High</td>
+                        <td>High</td>
+                        <td class="highlight">Low</td>
+                        <td>Medium</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Settlement</strong></td>
+                        <td>Cross-network daily</td>
+                        <td>Cross-network daily</td>
+                        <td class="highlight">Internal only</td>
+                        <td>Single network</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <script>
+        function showScenario(num) {
+            // Hide all scenarios
+            document.querySelectorAll('.scenario-container').forEach(container => {
+                container.classList.remove('active');
+            });
+            
+            // Remove active class from all tabs
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected scenario
+            document.getElementById('scenario' + num).classList.add('active');
+            
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html>
